@@ -224,3 +224,42 @@ body.dark-mode .chart-point {
     padding: 80px;
     font-weight: 600;
 }
+
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 16px;
+    }
+
+    .dashboard-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .dashboard-tile {
+        padding: 16px 12px;
+        border-radius: 12px;
+    }
+
+    .tile-header {
+        font-size: 0.65rem;
+    }
+
+    .tile-count {
+        font-size: 1.75rem;
+        margin: 8px 0 4px 0;
+    }
+
+    .tile-sub {
+        font-size: 0.7rem;
+    }
+
+    .dashboard-card {
+        padding: 20px;
+    }
+
+    .section-header {
+        font-size: 1.1rem;
+        margin-bottom: 16px;
+    }
+}

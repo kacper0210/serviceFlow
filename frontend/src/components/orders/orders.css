@@ -249,6 +249,29 @@ body.dark-mode .orders-table tr:hover {
 }
 
 @media (max-width: 768px) {
+  .toolbar {
+    padding: 16px;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-box {
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .actions-box {
+    width: 100%;
+  }
+
+  .actions-box button {
+    width: 100%;
+    justify-content: center;
+  }
+
   .table-container {
     background: none;
     border: none;
@@ -274,39 +297,70 @@ body.dark-mode .orders-table tr:hover {
   .orders-table tr {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    margin-bottom: 16px;
-    padding: 12px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    padding: 0; /* Padding will be on the cells */
     box-shadow: var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .orders-table td { 
     border: none;
     border-bottom: 1px solid var(--bg-gray);
-    position: relative;
-    padding-left: 45% !important; 
-    text-align: right;
-    min-height: 45px;
+    padding: 12px 16px !important;
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: flex-end;
+    text-align: right;
+    min-height: auto;
+  }
+
+  /* Specyficzne style dla nagłówka karty (ID i Tytuł) */
+  .orders-table td:nth-child(1) {
+    background: var(--bg-gray);
+    font-weight: 800;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .orders-table td:nth-child(2) {
+    font-size: 1.1rem;
+    padding: 16px !important;
+    justify-content: flex-start;
+    text-align: left;
+    border-bottom: 2px solid var(--bg-gray);
+  }
+
+  .orders-table td:nth-child(2) strong {
+    color: var(--primary-color);
   }
 
   .orders-table td:last-child {
     border-bottom: none;
+    background: rgba(0, 0, 0, 0.02);
+    padding: 15px 16px !important;
+  }
+
+  body.dark-mode .orders-table td:last-child {
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .orders-table td::before { 
-    position: absolute;
-    left: 12px;
-    width: 40%; 
-    white-space: nowrap;
     content: attr(data-label);
-    font-weight: 800;
+    font-weight: 700;
     text-transform: uppercase;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
     text-align: left;
+  }
+
+  /* Ukrywamy label dla Tytułu i ID, bo są oczywiste w tym układzie */
+  .orders-table td:nth-child(1)::before,
+  .orders-table td:nth-child(2)::before {
+    display: none;
   }
 
   /* Calendar Mobile */

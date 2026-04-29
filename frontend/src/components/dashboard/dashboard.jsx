@@ -10,8 +10,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [showAddClient, setShowAddClient] = useState(false);
-  const [showAddOrder, setShowAddOrder] = useState(false);
   const [manualProfits, setManualProfits] = useState({});
 
   const fetchData = async () => {
@@ -180,57 +178,7 @@ export default function Dashboard() {
               )}
             </section>
           </div>
-
-          <section className="dashboard-card">
-            <h2 className="section-header">⚡ Szybkie akcje</h2>
-            <div className="dashboard-quick-actions">
-              <button className="btn-primary" onClick={() => setShowAddOrder(true)}>
-                + Dodaj zlecenie
-              </button>
-              <button className="btn-primary" onClick={() => setShowAddClient(true)}>
-                + Dodaj klienta
-              </button>
-
-              <div style={{ width: 1, height: 24, background: 'var(--border-color)', margin: '0 8px' }}></div>
-
-              <Link to="/calendar" className="dashboard-link-btn">
-                📅 Kalendarz
-              </Link>
-              <Link to="/settings" className="dashboard-link-btn">
-                ⚙️ Ustawienia
-              </Link>
-            </div>
-          </section>
         </>
-      )}
-
-      {showAddClient && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <button className="close-btn" onClick={() => setShowAddClient(false)}>✕</button>
-            <AddClientForm
-              onClientAdded={() => {
-                setShowAddClient(false);
-                fetchData();
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {showAddOrder && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <button className="close-btn" onClick={() => setShowAddOrder(false)}>✕</button>
-            <h3 style={{ textAlign: 'center', marginTop: 0 }}>Nowe zlecenie</h3>
-            <AddOrderForm
-              onOrderAdded={() => {
-                setShowAddOrder(false);
-                fetchData();
-              }}
-            />
-          </div>
-        </div>
       )}
 
     </div>
