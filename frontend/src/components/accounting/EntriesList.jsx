@@ -314,6 +314,8 @@ export default function EntriesList({ type }) {
                        <td className="month-sum-actions"></td>
                     </tr>
                   );
+                }
+
                 acc.push(
                   <tr key={e.id} className={e.is_ready ? "row-ready" : ""}>
                     <td data-label="Status" style={{ textAlign: 'center' }}>

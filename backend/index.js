@@ -9,6 +9,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Root route to confirm server status
+app.get("/", (req, res) => {
+  res.send("Serwer ServiceFlow działa poprawnie! Korzystaj z endpointów /api.");
+});
+
+// Health check for cloud services
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 const sessions = new Map();
 
 const asyncHandler = fn => (req, res, next) =>
