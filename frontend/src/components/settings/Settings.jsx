@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import "./settings.css";
+import "./Settings.css";
 
 export default function Settings() {
   const [companyName, setCompanyName] = useState(() => localStorage.getItem("company_name") || "");
