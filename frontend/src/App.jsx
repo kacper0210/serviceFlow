@@ -81,6 +81,12 @@ function Navbar({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("auth");
@@ -90,16 +96,21 @@ function Navbar({ user }) {
 
   return (
     <nav className="navbar">
-      <div className="nav-brand">System Zleceń</div>
+      <div className="nav-brand">
+        System Zleceń
+      </div>
 
-      <div className="nav-links">
+      <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+        {mobileMenuOpen ? '✕' : '☰'}
+      </button>
+
+      <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Start</NavLink>
         <NavLink to="/orders" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Zlecenia</NavLink>
         <NavLink to="/clients" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Klienci</NavLink>
         <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Kalendarz</NavLink>
         <NavLink to="/accounting" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Księgowość</NavLink>
         {user.role === "admin" && (
-
           <NavLink to="/users" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Użytkownicy</NavLink>
         )}
       </div>
