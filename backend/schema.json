@@ -1,0 +1,338 @@
+[
+  {
+    "table_name": "orders",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "type",
+    "data_type": "character varying",
+    "character_maximum_length": 20,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "audit_logs",
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "orders",
+    "column_name": "client_id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "order_costs",
+    "column_name": "order_id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "audit_logs",
+    "column_name": "target_id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "issues",
+    "column_name": "type",
+    "data_type": "character varying",
+    "character_maximum_length": 50,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "users",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "nip",
+    "data_type": "character varying",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "audit_logs",
+    "column_name": "action",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "phone",
+    "data_type": "character varying",
+    "character_maximum_length": 20,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "orders",
+    "column_name": "status",
+    "data_type": "character varying",
+    "character_maximum_length": 50,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "last_name",
+    "data_type": "character varying",
+    "character_maximum_length": 100,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "order_costs",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "issues",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "users",
+    "column_name": "email",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "address",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "company_name",
+    "data_type": "character varying",
+    "character_maximum_length": 150,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "users",
+    "column_name": "role",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "audit_logs",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "orders",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "issues",
+    "column_name": "user_email",
+    "data_type": "character varying",
+    "character_maximum_length": 255,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "users",
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "users",
+    "column_name": "password_hash",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "clients",
+    "column_name": "first_name",
+    "data_type": "character varying",
+    "character_maximum_length": 100,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "orders",
+    "column_name": "price",
+    "data_type": "numeric",
+    "character_maximum_length": null,
+    "numeric_precision": 100,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "clients",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "orders",
+    "column_name": "notes",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "issues",
+    "column_name": "description",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "orders",
+    "column_name": "deadline",
+    "data_type": "timestamp with time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "orders",
+    "column_name": "title",
+    "data_type": "character varying",
+    "character_maximum_length": 200,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "order_costs",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "character_maximum_length": null,
+    "numeric_precision": 10,
+    "numeric_scale": 2
+  },
+  {
+    "table_name": "clients",
+    "column_name": "email",
+    "data_type": "character varying",
+    "character_maximum_length": 150,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "order_costs",
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "issues",
+    "column_name": "status",
+    "data_type": "character varying",
+    "character_maximum_length": 50,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "audit_logs",
+    "column_name": "actor_id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "orders",
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  },
+  {
+    "table_name": "users",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "order_costs",
+    "column_name": "title",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "orders",
+    "column_name": "description",
+    "data_type": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null
+  },
+  {
+    "table_name": "issues",
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0
+  }
+]

@@ -1,0 +1,226 @@
+.dashboard-container {
+    padding: 32px;
+    max-width: 1300px;
+    margin: 0 auto;
+    color: var(--text-color);
+}
+
+.section-header {
+    margin: 0 0 24px 0;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    letter-spacing: -0.02em;
+}
+
+.dashboard-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+
+.dashboard-tile {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-tile:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--card-shadow-hover);
+    border-color: var(--primary-color);
+}
+
+.dashboard-tile::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 100%;
+}
+
+.status-tile-new::after { background: var(--primary-color); }
+.status-tile-progress::after { background: var(--warning); }
+.status-tile-done::after { background: var(--success); }
+.status-tile-clients::after { background: var(--text-muted); }
+
+.tile-header {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tile-count {
+    font-size: 2.75rem;
+    font-weight: 800;
+    margin: 16px 0 8px 0;
+    color: var(--text-main);
+    line-height: 1;
+    letter-spacing: -0.05em;
+}
+
+.tile-sub {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.dashboard-charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 32px;
+    margin-bottom: 40px;
+}
+
+@media (max-width: 1000px) {
+    .dashboard-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dashboard-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: var(--card-shadow);
+}
+
+.activity-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.activity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item:hover {
+    padding-left: 8px;
+}
+
+.activity-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.activity-title {
+    font-weight: 700;
+    color: var(--text-main);
+    font-size: 1rem;
+}
+
+.activity-status {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.activity-date {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.dashboard-quick-actions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.chart-container-wrapper {
+    width: 100%;
+    margin-top: 32px;
+    position: relative;
+}
+
+.chart-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+}
+
+.chart-grid-line {
+    stroke: var(--border-color);
+    stroke-width: 1;
+}
+
+.chart-line {
+    stroke: var(--primary-color);
+    stroke-width: 4;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.chart-area {
+    fill: url(#chart-gradient);
+    opacity: 0.15;
+}
+
+.chart-point {
+    fill: white;
+    stroke: var(--primary-color);
+    stroke-width: 3;
+    transition: all 0.2s;
+}
+
+body.dark-mode .chart-point {
+  fill: var(--bg-card);
+}
+
+.chart-point:hover {
+    r: 7;
+    stroke-width: 4;
+}
+
+.chart-label {
+    fill: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.chart-value-label {
+    fill: var(--text-main);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.loading-text {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    padding: 80px;
+    font-weight: 600;
+}

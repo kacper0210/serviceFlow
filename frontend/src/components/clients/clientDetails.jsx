@@ -1,91 +1,149 @@
 import { useEffect, useState } from "react";
-import { btnCancel } from "./clientsStyles";
+import "./clients.css";
 
 export default function ClientDetails({ clientId, onClose }) {
   const [client, setClient] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!clientId) return;
 
-    // Pobierz szczegóły klienta
-    fetch(`http://localhost:4000/api/clients/${clientId}`)
-      .then((res) => res.json())
-      .then((data) => setClient(data))
-      .catch(console.error);
+    const fetchData = async () => {
+      setLoading(true);
+      setError("");
 
-    // Pobierz jego zlecenia
-    fetch(`http://localhost:4000/api/orders?client=${clientId}`)
-      .then((res) => res.json())
-      .then((data) => setOrders(data))
-      .catch(console.error);
+      try {
+        const authStorage = localStorage.getItem("auth");
+        const token = authStorage ? JSON.parse(authStorage).token : null;
+
+        const headers = {
+          "Authorization": `Bearer ${token}`
+        };
+
+        const clientRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients/${clientId}`, { headers });
+
+        if (!clientRes.ok) {
+          throw new Error("Nie znaleziono klienta");
+        }
+        const clientData = await clientRes.json();
+
+        const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders?client=${clientId}`, { headers });
+        let ordersData = [];
+        if (ordersRes.ok) {
+          ordersData = await ordersRes.json();
+        }
+
+        setClient(clientData);
+        setOrders(ordersData);
+
+      } catch (err) {
+        console.error("Błąd pobierania szczegółów:", err);
+        setError("Nie udało się załadować danych.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
   }, [clientId]);
 
-  if (!client) return null;
+  if (loading) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <p>Ładowanie danych...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <p style={{ color: "red" }}>{error}</p>
+          <button onClick={onClose}>Zamknij</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={modalOverlay}>
-      <div style={modalBox}>
-        <h2>
-          {client.first_name} {client.last_name}
-        </h2>
-        <p>
-          📧 {client.email || "brak e-maila"} <br />
-          📞 {client.phone || "brak telefonu"} <br />
-          🏠 {client.address || "brak adresu"}
-        </p>
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h3>Szczegóły klienta</h3>
+          <button onClick={onClose} className="close-btn">✕</button>
+        </div>
 
-        {client.company_name && (
-          <p>
-            🏢 {client.company_name}
-            {client.nip && <><br />NIP: {client.nip}</>}
-          </p>
+        {client && (
+          <div className="details-container">
+            <div className="detail-row">
+              <span className="label">Imię i nazwisko:</span>
+              <span className="value">{client.first_name} {client.last_name}</span>
+            </div>
+
+            <div className="detail-row">
+              <span className="label">Telefon:</span>
+              <span className="value">{client.phone}</span>
+            </div>
+
+            <div className="detail-row">
+              <span className="label">Email:</span>
+              <span className="value">{client.email || "brak"}</span>
+            </div>
+
+            <div className="detail-row">
+              <span className="label">Adres:</span>
+              <span className="value">{client.address || "brak"}</span>
+            </div>
+
+            {client.type === "firma" && (
+              <div className="company-section">
+                <hr />
+                <h4>Dane firmy</h4>
+                <div className="detail-row">
+                  <span className="label">Nazwa firmy:</span>
+                  <span className="value">{client.company_name}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="label">NIP:</span>
+                  <span className="value">{client.nip}</span>
+                </div>
+              </div>
+            )}
+
+            <hr />
+
+            <div className="orders-section">
+              <h4>Ostatnie zlecenia</h4>
+
+              <div className="orders-list">
+                {orders.length === 0 ? (
+                  <p className="no-data">Brak zleceń w historii.</p>
+                ) : (
+                  orders.map((order) => (
+                    <div key={order.id} className="order-item">
+                      <span className="order-title">{order.title}</span>
+                      <span className={`status-badge status-${order.status.toLowerCase()}`}>
+                        {order.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
         )}
 
-        <hr />
-        <h3>Zlecenia klienta:</h3>
-        {orders.length > 0 ? (
-          <ul>
-            {orders.map((o) => (
-              <li key={o.id}>
-                <b>{o.title}</b> – {o.status}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>Brak zleceń.</p>
-        )}
-
-        <button onClick={onClose} style={btnCancel}>
-          Zamknij
-        </button>
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-close">Zamknij</button>
+        </div>
       </div>
     </div>
   );
 }
-
-// 🌙 Prosty styl modala
-const modalOverlay = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100vw",
-  height: "100vh",
-  background: "rgba(0,0,0,0.5)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 2000,
-};
-
-const modalBox = {
-  background: "#fff",
-  color: "#222",
-  borderRadius: "10px",
-  padding: "20px 30px",
-  maxWidth: "500px",
-  width: "90%",
-  maxHeight: "80vh",
-  overflowY: "auto",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-};

@@ -1,0 +1,99 @@
+/* auth.css */
+
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    /* Wyśrodkowanie w pionie */
+    padding: 20px;
+}
+
+.login-box {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    padding: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.login-title {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: var(--text-color);
+}
+
+.input-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--muted-color);
+}
+
+/* Inputy dostosowane do motywu */
+.login-input {
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: #ffffff !important;
+    /* Wymuszamy, chyba że wolisz ciemne */
+    color: #333 !important;
+    font-size: 16px;
+    transition: border-color 0.2s;
+}
+
+/* W trybie ciemnym, jeśli body ma klasę dark-mode (z Settings),
+   inputy mogą wyglądać lepiej, jeśli dostosujemy je tutaj,
+   ale dla bezpieczeństwa zostawiłem białe.
+   Jeśli chcesz ciemne inputy w loginie, usuń !important wyżej. */
+
+.login-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.login-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 10px;
+    transition: background 0.2s;
+}
+
+.login-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+}
+
+.login-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background: var(--muted-color);
+}
+
+.error-message {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    border: 1px solid #fecaca;
+    font-size: 0.9rem;
+}

@@ -1,0 +1,137 @@
+.users-container {
+    padding: 0;
+    width: 100%;
+}
+
+.users-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin-bottom: 24px;
+    letter-spacing: -0.025em;
+}
+
+.users-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+    box-shadow: var(--card-shadow);
+}
+
+.users-section-title {
+    margin-top: 0;
+    margin-bottom: 24px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.users-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.users-input,
+.users-select {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--input-text);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.users-input:focus,
+.users-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.users-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    padding: 12px 0;
+}
+
+.table-wrapper {
+    background: var(--bg-card);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table th {
+    background: var(--bg-gray);
+    padding: 16px 20px;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.users-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 0.95rem;
+}
+
+.users-table tr:last-child td {
+  border-bottom: none;
+}
+
+.users-table tr:hover {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+
+body.dark-mode .users-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.users-action-btn {
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.users-btn-change-pass {
+    color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.users-btn-delete {
+    color: var(--danger-color);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.users-btn-change-pass:hover,
+.users-btn-delete:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}

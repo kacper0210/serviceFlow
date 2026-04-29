@@ -1,259 +1,278 @@
 import { useEffect, useState } from "react";
+import AddClientForm from "./addClientForm";
 import ClientDetails from "./clientDetails";
-import { fetchClientsFromApi } from "./utils";
-import { btnEdit, btnDelete } from "./clientsStyles";
+import EditClientForm from "./editClientForm";
+import "./clients.css";
 
-export default function ClientsList({ refreshTrigger }) {
+export default function ClientsList() {
   const [clients, setClients] = useState([]);
-  const [editingClient, setEditingClient] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // 🔄 Pobieranie klientów
+  const [searchText, setSearchText] = useState("");
+  const [filterType, setFilterType] = useState("wszyscy");
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+  const [detailsId, setDetailsId] = useState(null);
+
+  const [selectedIds, setSelectedIds] = useState([]);
+
   const fetchClients = async () => {
-    setIsLoading(true);
-    const data = await fetchClientsFromApi();
-    if (data) setClients(data);
-    setIsLoading(false);
+    setLoading(true);
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const token = authData?.token;
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error("Błąd pobierania");
+
+      const data = await res.json();
+      setClients(data);
+    } catch (err) {
+      console.error(err);
+      alert("Nie udało się pobrać listy klientów");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchClients();
-  }, [refreshTrigger]);
+  }, []);
 
-  // 🗑️ Usuwanie klienta
+  const filteredClients = clients.filter(client => {
+    if (filterType !== "wszyscy" && client.type !== filterType) return false;
+
+    const text = searchText.toLowerCase();
+    const fullString = `${client.first_name} ${client.last_name} ${client.company_name || ""} ${client.email}`.toLowerCase();
+
+    return fullString.includes(text);
+  });
+
   const handleDelete = async (id) => {
     if (!window.confirm("Czy na pewno chcesz usunąć tego klienta?")) return;
 
+    const authData = JSON.parse(localStorage.getItem("auth"));
+
     try {
-      const res = await fetch(`http://localhost:4000/api/clients/${id}`, {
+      let res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients/${id}`, {
         method: "DELETE",
+        headers: { "Authorization": `Bearer ${authData.token}` }
       });
-      const data = await res.json();
+
+      if (res.status === 400) {
+        const confirmForce = window.confirm("Ten klient ma przypisane zlecenia. Czy usunąć go WRAZ ZE ZLECENIAMI? Tej operacji nie można cofnąć.");
+
+        if (confirmForce) {
+          res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients/${id}?force=true`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${authData.token}` }
+          });
+        } else {
+          return;
+        }
+      }
 
       if (res.ok) {
-        setClients((prev) => prev.filter((c) => c.id !== id));
-        alert("Klient został usunięty.");
-      } else if (res.status === 400 && data.assignedOrders) {
-        const ordersList = data.assignedOrders
-          .map((o) => `• ${o.title} (ID: ${o.id})`)
-          .join("\n");
-        alert(
-          `Nie można usunąć klienta, ponieważ ma przypisane zlecenia:\n\n${ordersList}`
-        );
+        setClients(prev => prev.filter(c => c.id !== id));
+        alert("Usunięto pomyślnie.");
       } else {
-        alert("Nie udało się usunąć klienta.");
+        alert("Wystąpił błąd podczas usuwania.");
       }
-    } catch (err) {
-      console.error(err);
-      alert("Błąd połączenia z serwerem.");
+
+    } catch (e) {
+      console.error(e);
+      alert("Błąd serwera.");
     }
   };
 
-  // ✏️ Edycja klienta
-  const handleEdit = (client) => {
-    setEditingClient(client.id);
-    setEditForm({ ...client });
-  };
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Czy usunąć zaznaczone osoby (${selectedIds.length})?`)) return;
 
-  const handleChange = (e) => {
-    setEditForm({ ...editForm, [e.target.name]: e.target.value });
-  };
+    const authData = JSON.parse(localStorage.getItem("auth"));
 
-  const handleSave = async (id) => {
-    try {
-      const res = await fetch(`http://localhost:4000/api/clients/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
+    for (const id of selectedIds) {
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients/${id}?force=true`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${authData.token}` }
       });
-      if (res.ok) {
-        setEditingClient(null);
-        fetchClients();
-      } else {
-        alert("Nie udało się zapisać zmian");
-      }
-    } catch (err) {
-      console.error(err);
+    }
+
+    setSelectedIds([]);
+    fetchClients();
+  };
+
+  const toggleSelect = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    } else {
+      setSelectedIds(prev => [...prev, id]);
     }
   };
 
-  if (isLoading) {
-    return (
-      <p style={{ color: "#ccc", textAlign: "center" }}>
-        Ładowanie klientów...
-      </p>
-    );
-  }
+  const exportToCSV = () => {
+    if (clients.length === 0) return;
+    const header = "ID,Imie,Nazwisko,Firma,Email\n";
+    const rows = clients.map(c =>
+      `${c.id},${c.first_name},${c.last_name},${c.company_name || ""},${c.email}`
+    ).join("\n");
+
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'klienci.csv';
+    a.click();
+  };
+
+  const selectAll = () => {
+    if (selectedIds.length === filteredClients.length && filteredClients.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredClients.map(c => c.id));
+    }
+  };
 
   return (
-    <>
-      {/* 🔍 Modal szczegółów klienta */}
-      {selectedClientId && (
+    <div className="clients-page-container">
+
+
+      <div className="toolbar">
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Szukaj klienta..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <option value="wszyscy">Wszyscy</option>
+            <option value="osoba_prywatna">Osoba prywatna</option>
+            <option value="firma">Firma</option>
+          </select>
+        </div>
+
+        <div className="actions-box">
+          <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+            + Dodaj klienta
+          </button>
+          <button className="btn-secondary" onClick={exportToCSV}>
+            CSV
+          </button>
+          {selectedIds.length > 0 && (
+            <button className="btn-danger" onClick={handleBulkDelete}>
+              Usuń zaznaczone ({selectedIds.length})
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="table-container">
+        {loading ? (
+          <p>Ładowanie danych...</p>
+        ) : (
+          <table className="clients-table">
+            <thead>
+               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={filteredClients.length > 0 && selectedIds.length === filteredClients.length}
+                    onChange={selectAll}
+                  />
+                </th>
+
+                <th>Imię i Nazwisko / Firma</th>
+                <th>Kontakt</th>
+                <th>Typ</th>
+                <th>Akcje</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.map(client => (
+                <tr key={client.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(client.id)}
+                      onChange={() => toggleSelect(client.id)}
+                    />
+                  </td>
+                  <td>
+                    <strong>{client.first_name} {client.last_name}</strong>
+                    {client.company_name && (
+                      <div className="company-subtext">{client.company_name}</div>
+                    )}
+                  </td>
+                  <td>
+                    <div>{client.email}</div>
+                    <div style={{ fontSize: '0.85em', color: '#666' }}>{client.phone}</div>
+                  </td>
+                  <td>
+                    <span className={`badge ${client.type === 'firma' ? 'badge-company' : 'badge-person'}`}>
+                      {client.type === 'firma' ? 'Firma' : 'Osoba'}
+                    </span>
+                  </td>
+                  <td className="actions-cell">
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                      <button className="btn-table" onClick={() => setDetailsId(client.id)}>Podgląd</button>
+                      <button className="btn-table" onClick={() => setEditingClient(client)}>Edytuj</button>
+                      <button className="btn-table btn-delete" onClick={() => handleDelete(client.id)}>Usuń</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredClients.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: "center", padding: "20px" }}>
+                    Brak wyników wyszukiwania
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {showAddModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <button className="close-btn" onClick={() => setShowAddModal(false)}>✕</button>
+            <AddClientForm onClientAdded={(newClient) => {
+              setClients(prev => [...prev, newClient]);
+              setShowAddModal(false);
+            }} />
+          </div>
+        </div>
+      )}
+
+      {editingClient && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <button className="close-btn" onClick={() => setEditingClient(null)}>✕</button>
+            <EditClientForm
+              client={editingClient}
+              onCancel={() => setEditingClient(null)}
+              onSaved={() => {
+                fetchClients();
+                setEditingClient(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {detailsId && (
         <ClientDetails
-          clientId={selectedClientId}
-          onClose={() => setSelectedClientId(null)}
+          clientId={detailsId}
+          onClose={() => setDetailsId(null)}
         />
       )}
 
-      {/* 📋 Tabela klientów */}
-      <div style={tableContainer}>
-        <div style={tableHeader}>
-          <span>Imię</span>
-          <span>Nazwisko</span>
-          <span>Email</span>
-          <span>Telefon</span>
-          <span>Typ</span>
-          <span>Firma</span>
-          <span>Akcje</span>
-        </div>
-
-        {clients.map((client) => (
-          <div
-            key={client.id}
-            style={{
-              ...tableRow,
-              background:
-                editingClient === client.id ? "#f8f9fa" : "white",
-            }}
-          >
-            {editingClient === client.id ? (
-              <>
-                <input
-                  name="first_name"
-                  value={editForm.first_name}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                <input
-                  name="last_name"
-                  value={editForm.last_name}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                <input
-                  name="email"
-                  value={editForm.email || ""}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                <input
-                  name="phone"
-                  value={editForm.phone || ""}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                <select
-                  name="type"
-                  value={editForm.type}
-                  onChange={handleChange}
-                  style={inputStyle}
-                >
-                  <option value="osoba_prywatna">Osoba prywatna</option>
-                  <option value="firma">Firma</option>
-                </select>
-                <input
-                  name="company_name"
-                  value={editForm.company_name || ""}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                <div style={{ display: "flex", gap: "5px" }}>
-                  <button onClick={() => handleSave(client.id)} style={btnSave}>
-                    💾
-                  </button>
-                  <button
-                    onClick={() => setEditingClient(null)}
-                    style={btnCancel}
-                  >
-                    ✖
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <span
-                  onClick={() => setSelectedClientId(client.id)}
-                  style={{ cursor: "pointer", color: "#007bff" }}
-                >
-                  {client.first_name}
-                </span>
-                <span>{client.last_name}</span>
-                <span>{client.email || "-"}</span>
-                <span>{client.phone || "-"}</span>
-                <span>
-                  {client.type === "firma" ? "Firma" : "Osoba prywatna"}
-                </span>
-                <span>{client.company_name || "-"}</span>
-                <div style={{ display: "flex", gap: "5px" }}>
-                  <button onClick={() => handleEdit(client)} style={btnEdit}>
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => handleDelete(client.id)}
-                    style={btnDelete}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </>
+    </div>
   );
 }
-
-// 🎨 Style
-const tableContainer = {
-  background: "#fff",
-  borderRadius: "10px",
-  overflow: "hidden",
-  boxShadow: "0 0 5px rgba(0,0,0,0.1)",
-  marginTop: "10px",
-  color:"#222"
-};
-
-const tableHeader = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr 1.5fr 1fr 1fr 1fr auto",
-  background: "#382e2e",
-  color: "white",
-  fontWeight: "bold",
-  padding: "10px",
-};
-
-const tableRow = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr 1.5fr 1fr 1fr 1fr auto",
-  padding: "10px",
-  borderBottom: "1px solid #ddd",
-  alignItems: "center",
-};
-
-const inputStyle = {
-  padding: "6px",
-  border: "1px solid #ccc",
-  borderRadius: "4px",
-  width: "100%",
-};
-
-const btnSave = {
-  background: "#28a745",
-  color: "#fff",
-  border: "none",
-  borderRadius: "6px",
-  padding: "5px 8px",
-  cursor: "pointer",
-};
-
-const btnCancel = {
-  background: "#6c757d",
-  color: "#fff",
-  border: "none",
-  borderRadius: "6px",
-  padding: "5px 8px",
-  cursor: "pointer",
-};

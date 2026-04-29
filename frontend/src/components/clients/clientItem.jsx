@@ -1,89 +1,94 @@
 import { useState } from "react";
 import EditClientForm from "./editClientForm";
 import ClientDetails from "./clientDetails";
-import { btnEdit, btnDelete } from "./clientsStyles";
 
-export default function ClientItem({
-  client,
-  isEditing,
-  onEdit,
-  onCancelEdit,
-  onDelete,
-  onSaved,
-}) {
-  const [showDetails, setShowDetails] = useState(false);
+export default function ClientItem({ client, isEditing, onEdit, onCancelEdit, onDelete, onSaved }) {
+  const [showModal, setShowModal] = useState(false);
 
-  return (
-    <li
-      style={{
-        marginBottom: "15px",
-        padding: "15px",
-        border: "1px solid #ddd",
-        borderRadius: "8px",
-        background: "#fff",
-        color: "#222",
-        position: "relative",
-      }}
-    >
-      {isEditing ? (
+  // Jeśli jesteśmy w trybie edycji, wyświetlamy formularz zamiast karty
+  if (isEditing) {
+    return (
+      <div className="client-card editing-mode">
         <EditClientForm
           client={client}
           onCancel={onCancelEdit}
           onSaved={onSaved}
         />
-      ) : (
-        <>
-          {/* Klikalna część otwierająca szczegóły */}
-          <div
-            onClick={() => setShowDetails(true)}
-            style={{
-              cursor: "pointer",
-              paddingBottom: "10px",
-              borderBottom: "1px solid #eee",
-            }}
-          >
-            <strong>
-              {client.first_name} {client.last_name}
-            </strong>
-            <br />
-            <span>{client.email || "— brak emaila —"}</span>
-            <br />
-            <small>{client.type}</small>
-            <br />
-            {client.company_name && (
-              <>
-                <span>{client.company_name}</span>
-                <br />
-              </>
-            )}
-            {client.phone && (
-              <>
-                <span>📞 {client.phone}</span>
-                <br />
-              </>
-            )}
-            {client.address && <span>📍 {client.address}</span>}
-          </div>
+      </div>
+    );
+  }
 
-          {/* Przyciski akcji */}
-          <div style={{ marginTop: "10px" }}>
-            <button onClick={onEdit} style={btnEdit}>
-              ✏️ Edytuj
-            </button>
-            <button onClick={onDelete} style={btnDelete}>
-              🗑️ Usuń
-            </button>
-          </div>
+  // Normalny widok karty klienta
+  return (
+    <div className="client-card">
 
-          {/* Modal szczegółów klienta */}
-          {showDetails && (
-            <ClientDetails
-              clientId={client.id}
-              onClose={() => setShowDetails(false)}
-            />
+      {/* Kliknięcie w treść otwiera szczegóły */}
+      <div className="client-content-clickable" onClick={() => setShowModal(true)}>
+
+        <div className="client-header">
+          <span className="client-name">
+            {client.first_name} {client.last_name}
+          </span>
+
+          {/* Prosty warunek do koloru etykiety */}
+          <span className={client.type === 'firma' ? 'badge badge-company' : 'badge badge-person'}>
+            {client.type === 'firma' ? 'Firma' : 'Osoba'}
+          </span>
+        </div>
+
+        <div className="client-body">
+          {client.company_name && (
+            <div className="company-name-label">
+              {client.company_name}
+            </div>
           )}
-        </>
+
+          {/* Sekcja informacyjna - zrobiona "ręcznie" bez dodatkowych komponentów */}
+          <div className="info-list">
+
+            <div className="info-item">
+              <span className="icon">✉️</span>
+              <span>{client.email || "—"}</span>
+            </div>
+
+            <div className="info-item">
+              <span className="icon">📞</span>
+              <span>{client.phone}</span>
+            </div>
+
+            <div className="info-item">
+              <span className="icon">📍</span>
+              <span>{client.address || "Brak adresu"}</span>
+            </div>
+
+            {client.nip && (
+              <div className="info-item">
+                <span className="icon">🏢</span>
+                <span>NIP: {client.nip}</span>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </div>
+
+      {/* Przyciski akcji na dole karty */}
+      <div className="card-actions">
+        <button className="btn-edit" onClick={onEdit}>
+          Edytuj
+        </button>
+        <button className="btn-delete" onClick={onDelete}>
+          Usuń
+        </button>
+      </div>
+
+      {/* Modal ze szczegółami */}
+      {showModal && (
+        <ClientDetails
+          clientId={client.id}
+          onClose={() => setShowModal(false)}
+        />
       )}
-    </li>
+    </div>
   );
 }

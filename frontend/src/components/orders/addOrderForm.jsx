@@ -1,30 +1,32 @@
 import { useState, useEffect } from "react";
-import {
-  inputStyle,
-  btnPrimary,
-  btnIcon,
-  modalOverlay,
-  modalBox,
-  btnClose,
-} from "./ordersStyles";
 import AddClientForm from "../clients/addClientForm";
 
 export default function AddOrderForm({ onOrderAdded }) {
-  const [clients, setClients] = useState([]);
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showClientForm, setShowClientForm] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    client_id: "",
+    price: "",
+    deadline: "",
+    description: "",
+    status: "nowe"
+  });
 
-  // 🔄 Pobranie listy klientów
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showAddClient, setShowAddClient] = useState(false);
+
   const fetchClients = async () => {
     try {
-      const res = await fetch("http://localhost:4000/api/clients");
-      const data = await res.json();
-      setClients(data);
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients`, {
+        headers: { "Authorization": `Bearer ${authData?.token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Błąd pobierania klientów", err);
     }
   };
 
@@ -32,123 +34,166 @@ export default function AddOrderForm({ onOrderAdded }) {
     fetchClients();
   }, []);
 
-  // 🧾 Dodanie zlecenia
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedClientId || !title.trim()) {
-      alert("Wybierz klienta i podaj tytuł zlecenia!");
+    if (!formData.client_id) {
+      alert("Musisz wybrać klienta!");
       return;
     }
 
-    setIsSubmitting(true);
+    setLoading(true);
+
     try {
-      const res = await fetch("http://localhost:4000/api/orders", {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: selectedClientId,
-          title,
-          description,
-          status: "nowe",
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
+        body: JSON.stringify(formData)
       });
 
-      if (!res.ok) throw new Error(`Błąd serwera: ${res.status}`);
+      if (!res.ok) throw new Error("Błąd zapisu");
 
       const newOrder = await res.json();
-      if (onOrderAdded) onOrderAdded(newOrder);
 
-      setTitle("");
-      setDescription("");
-      setSelectedClientId("");
+      onOrderAdded(newOrder);
+      setFormData({
+        title: "", client_id: "", price: "", deadline: "", description: "", status: "nowe"
+      });
+      alert("Dodano zlecenie!");
+
     } catch (err) {
       console.error(err);
-      alert("Nie udało się dodać zlecenia.");
+      alert("Wystąpił błąd przy dodawaniu zlecenia.");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  // 🔁 Po dodaniu klienta odśwież listę
-  const handleClientAdded = () => {
-    fetchClients();
-    setShowClientForm(false);
-  };
-
   return (
-    <div style={{ position: "relative" }}>
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          background: "#fff",
-          padding: "20px",
-          borderRadius: "10px",
-          border: "1px solid #ddd",
-        }}
-      >
-        {/* 🔹 Lista klientów z przyciskiem ➕ */}
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <select
-            value={selectedClientId}
-            onChange={(e) => setSelectedClientId(e.target.value)}
-            style={{ ...inputStyle, flex: 1 }}
-          >
-            <option value="">-- Wybierz klienta --</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.first_name} {client.last_name}{" "}
-                {client.company_name ? `(${client.company_name})` : ""}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={() => setShowClientForm(true)}
-            style={btnIcon}
-            title="Dodaj nowego klienta"
-          >
-            +
+    <div className="order-form-container">
+      {showAddClient ? (
+        <div style={{ border: "1px dashed #ccc", padding: "10px", borderRadius: "5px", background: "#fafafa" }}>
+          <h4>Szybkie dodawanie klienta</h4>
+          <AddClientForm onClientAdded={(newClient) => {
+            setClients(prev => [...prev, newClient]);
+            setFormData(prev => ({ ...prev, client_id: newClient.id }));
+            setShowAddClient(false);
+          }} />
+          <button type="button" onClick={() => setShowAddClient(false)} className="link-btn" style={{ marginTop: 10 }}>
+            Anuluj dodawanie klienta
           </button>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 2 }}>
+              <label>Tytuł zlecenia *</label>
+              <input
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                className="form-input"
+                required
+                placeholder="np. Naprawa laptopa"
+              />
+            </div>
 
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Tytuł zlecenia"
-          style={inputStyle}
-          required
-        />
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Cena (PLN)</label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                className="form-input"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
 
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Opis zlecenia"
-          rows="4"
-          style={inputStyle}
-        />
+          <div className="form-group">
+            <label>Klient *</label>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <select
+                name="client_id"
+                value={formData.client_id}
+                onChange={handleChange}
+                className="form-select"
+                style={{ flex: 1 }}
+              >
+                <option value="">-- Wybierz klienta --</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.first_name} {c.last_name} {c.company_name ? `(${c.company_name})` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowAddClient(true)}
+                title="Dodaj nowego klienta"
+                style={{ padding: "0 15px", aspectRatio: "1" }}
+              >
+                +
+              </button>
 
-        <button type="submit" disabled={isSubmitting} style={btnPrimary}>
-          {isSubmitting ? "Dodawanie..." : "Dodaj zlecenie"}
-        </button>
-      </form>
+            </div>
+          </div>
 
-      {/* 🪟 Modal dodania klienta */}
-      {showClientForm && (
-        <div style={modalOverlay}>
-          <div style={modalBox}>
-            <h3>Dodaj klienta</h3>
-            <AddClientForm onClientAdded={handleClientAdded} />
-            <button onClick={() => setShowClientForm(false)} style={btnClose}>
-              Zamknij
+          <div className="form-row">
+            <div className="form-group">
+              <label>Termin (Deadline)</label>
+              <input
+                type="datetime-local"
+                name="deadline"
+                value={formData.deadline}
+                onChange={handleChange}
+                className="form-input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Status</label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="form-select"
+              >
+                <option value="nowe">Nowe</option>
+                <option value="w_trakcie">W realizacji</option>
+                <option value="zakonczone">Zakończone</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Opis / Usterka</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="form-textarea"
+            />
+          </div>
+
+          <div className="form-actions" style={{ marginTop: "20px", textAlign: "right" }}>
+            <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={loading}>
+              {loading ? "Zapisywanie..." : "Dodaj zlecenie"}
             </button>
           </div>
-        </div>
+
+        </form>
       )}
     </div>
   );

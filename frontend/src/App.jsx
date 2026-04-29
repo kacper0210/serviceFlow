@@ -1,146 +1,142 @@
-import { Routes, Route, Link, Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from "react-router-dom";
+import "./App.css";
 
-// 🧍 Komponenty klientów
 import ClientsList from "./components/clients/clientsList";
-import AddClientForm from "./components/clients/addClientForm";
-
-// 🧾 Komponenty zleceń
 import OrdersList from "./components/orders/ordersList";
-import AddOrderForm from "./components/orders/addOrderForm";
+import OrdersCalendar from "./components/orders/ordersCalendar";
+import Dashboard from "./components/dashboard/dashboard";
+import Login from "./components/auth/Login";
+import Settings from "./components/settings/Settings";
+import Users from "./components/users/Users";
+import Accounting from "./components/accounting/Accounting";
+
 
 export default function App() {
-  const [refreshClients, setRefreshClients] = useState(false);
-  const [refreshOrders, setRefreshOrders] = useState(false);
+  const [auth, setAuth] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  const checkAuth = () => {
+    try {
+      const stored = localStorage.getItem("auth");
+      if (stored) {
+        setAuth(JSON.parse(stored));
+      } else {
+        setAuth(null);
+      }
+    } catch {
+      setAuth(null);
+    }
+    setLoadingAuth(false);
+  };
+
+  useEffect(() => {
+    checkAuth();
+
+    window.addEventListener("auth-changed", checkAuth);
+
+    if (localStorage.getItem("theme") === "dark") {
+      document.body.classList.add("dark-mode");
+    }
+
+    return () => window.removeEventListener("auth-changed", checkAuth);
+  }, []);
+
+  if (loadingAuth) return null;
 
   return (
-    <div style={layout}>
-      {/* 🔝 Pasek menu */}
-      <header style={headerStyle}>
-        <h2 style={logoStyle}>ServiceFlow</h2>
-        <nav style={navStyle}>
-          <Link to="/clients" style={linkStyle}>Klienci</Link>
-          <Link to="/orders" style={linkStyle}>Zlecenia</Link>
-          <Link to="/calendar" style={linkStyle}>Kalendarz</Link>
-          <Link to="/settings" style={linkStyle}>Ustawienia</Link>
-        </nav>
-      </header>
+    <div className="app-layout">
+      {auth && <Navbar user={auth.user} />}
 
-      {/* 🧭 Główna zawartość */}
-      <main style={mainStyle}>
+      <main className="app-content">
         <Routes>
-          <Route
-            path="/clients"
-            element={
-              <PageLayout
-                title="Klienci"
-                addSection={
-                  <AddClientForm onClientAdded={() => setRefreshClients(prev => !prev)} />
-                }
-                listSection={
-                  <ClientsList refreshTrigger={refreshClients} />
-                }
-              />
-            }
-          />
+          <Route path="/login" element={!auth ? <Login /> : <Navigate to="/" />} />
 
-          <Route
-            path="/orders"
-            element={
-              <PageLayout
-                title="Zlecenia"
-                addSection={
-                  <AddOrderForm onOrderAdded={() => setRefreshOrders(prev => !prev)} />
-                }
-                listSection={
-                  <OrdersList refreshTrigger={refreshOrders} />
-                }
-              />
-            }
-          />
+          <Route path="/" element={<PrivateRoute auth={auth}><Dashboard /></PrivateRoute>} />
+          <Route path="/clients" element={<PrivateRoute auth={auth}><ClientsList /></PrivateRoute>} />
+          <Route path="/orders" element={<PrivateRoute auth={auth}><OrdersList /></PrivateRoute>} />
+          <Route path="/calendar" element={<PrivateRoute auth={auth}><OrdersCalendar /></PrivateRoute>} />
+          <Route path="/accounting" element={<PrivateRoute auth={auth}><Accounting /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute auth={auth}><Settings /></PrivateRoute>} />
 
-          <Route path="/" element={<Navigate to="/clients" />} />
+
+          <Route path="/users" element={
+            <PrivateRoute auth={auth}>
+              {auth?.user?.role === "admin" ? <Users /> : <Navigate to="/" />}
+            </PrivateRoute>
+          } />
+
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
     </div>
   );
 }
 
-/* 🧩 Wspólny układ sekcji strony (formularz + lista) */
-function PageLayout({ title, addSection, listSection }) {
-  return (
-    <div>
-      <h1 style={pageTitle}>{title}</h1>
-
-      <section style={section}>
-        <h2 style={sectionTitle}>Dodaj {title.toLowerCase().slice(0, -1)}</h2>
-        {addSection}
-      </section>
-
-      <section style={section}>
-        <h2 style={sectionTitle}>Lista {title.toLowerCase()}</h2>
-        {listSection}
-      </section>
-    </div>
-  );
+function PrivateRoute({ auth, children }) {
+  return auth ? children : <Navigate to="/login" />;
 }
 
-/* 🎨 STYLE */
-const layout = {
-  minHeight: "100vh",
-  display: "flex",
-  flexDirection: "column",
-};
+function Navbar({ user }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
-const headerStyle = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100%",
-  background: "#382e2e",
-  padding: "15px 40px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  color: "white",
-  zIndex: 1000,
-  boxSizing: "border-box",
-};
+  const handleLogout = () => {
+    localStorage.removeItem("auth");
+    window.dispatchEvent(new Event("auth-changed"));
+    navigate("/login");
+  };
 
-const logoStyle = { margin: 0, fontSize: "1.5rem" };
-const navStyle = { display: "flex", gap: "25px" };
+  return (
+    <nav className="navbar">
+      <div className="nav-brand">System Zleceń</div>
 
-const linkStyle = {
-  color: "white",
-  textDecoration: "none",
-  fontWeight: "bold",
-  transition: "opacity 0.2s",
-};
+      <div className="nav-links">
+        <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Start</NavLink>
+        <NavLink to="/orders" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Zlecenia</NavLink>
+        <NavLink to="/clients" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Klienci</NavLink>
+        <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Kalendarz</NavLink>
+        <NavLink to="/accounting" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Księgowość</NavLink>
+        {user.role === "admin" && (
 
-const mainStyle = {
-  flexGrow: 1,
-  width: "100vw",
-  minHeight: "100vh",
-  margin: 0,
-  padding: "100px 40px 40px",
-  color: "#222",
-  background: "#f6f6f6",
-  overflowY: "auto",
-  boxSizing: "border-box",
-};
+          <NavLink to="/users" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Użytkownicy</NavLink>
+        )}
+      </div>
 
-const pageTitle = {
-  textAlign: "center",
-  color: "#222",
-  marginBottom: "30px",
-};
+      <div className="nav-user">
+        <button
+          onClick={() => {
+            const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+            if (newTheme === 'dark') document.body.classList.add('dark-mode');
+            else document.body.classList.remove('dark-mode');
+            localStorage.setItem("theme", newTheme);
+          }}
+          className="theme-toggle-btn"
+          title="Przełącz motyw"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.2rem',
+            marginRight: '15px',
+            color: 'var(--text-main)'
+          }}
+        >
+          ◑
+        </button>
 
-const section = {
-  marginBottom: "40px",
-  background: "white",
-  padding: "20px",
-  borderRadius: "10px",
-  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-};
+        <div className="user-avatar" onClick={() => setMenuOpen(!menuOpen)}>
+          {user.email.substring(0, 2).toUpperCase()}
+        </div>
 
-const sectionTitle = { color: "#333", marginBottom: "15px" };
+        {menuOpen && (
+          <div className="user-dropdown">
+            <div className="dropdown-item" onClick={() => { navigate("/settings"); setMenuOpen(false); }}>Ustawienia</div>
+            <div className="dropdown-item text-danger" onClick={handleLogout}>Wyloguj</div>
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}

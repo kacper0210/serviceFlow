@@ -1,5 +1,4 @@
 import EditOrderForm from "./editOrderForm";
-import { btnEdit, btnDelete } from "./ordersStyles";
 
 export default function OrderItem({
   order,
@@ -13,20 +12,15 @@ export default function OrderItem({
   return (
     <div
       style={{
-        border: "1px solid #ddd",
+        border: "1px solid var(--card-border)",
         borderRadius: "8px",
-        background: "#fff",
+        background: "var(--card-bg)",
         padding: "10px",
-        color: "#222",
+        color: "var(--text)",
       }}
     >
       {isEditing ? (
-        <EditOrderForm
-          order={order}
-          clients={clients}
-          onCancel={onCancelEdit}
-          onSaved={onSaved}
-        />
+        <EditOrderForm order={order} clients={clients} onCancel={onCancelEdit} onSaved={onSaved} />
       ) : (
         <>
           <b>{order.title}</b> – {order.status}
@@ -36,17 +30,16 @@ export default function OrderItem({
             {order.phone
               ? `(📞 ${order.phone})`
               : order.email
-              ? `(✉️ ${order.email})`
-              : "(brak danych kontaktowych)"}
+                ? `(✉️ ${order.email})`
+                : "(brak danych kontaktowych)"}
           </small>
           <br />
           {order.description}
-
           <div style={{ marginTop: "8px" }}>
-            <button onClick={onEdit} style={btnEdit}>
+            <button onClick={onEdit} className="btn-edit">
               ✏️ Edytuj
             </button>
-            <button onClick={onDelete} style={btnDelete}>
+            <button onClick={onDelete} className="btn-delete">
               🗑️ Usuń
             </button>
           </div>
