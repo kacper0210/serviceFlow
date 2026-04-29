@@ -50,7 +50,8 @@
   background: var(--bg-card);
   border-radius: 16px;
   box-shadow: var(--card-shadow);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-color);
   margin-bottom: 32px;
 }
@@ -245,4 +246,119 @@ body.dark-mode .orders-table tr:hover {
   opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .table-container {
+    background: none;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .orders-table, 
+  .orders-table thead, 
+  .orders-table tbody, 
+  .orders-table th, 
+  .orders-table td, 
+  .orders-table tr { 
+    display: block; 
+  }
+
+  .orders-table thead tr { 
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .orders-table tr {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    padding: 12px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .orders-table td { 
+    border: none;
+    border-bottom: 1px solid var(--bg-gray);
+    position: relative;
+    padding-left: 45% !important; 
+    text-align: right;
+    min-height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .orders-table td:last-child {
+    border-bottom: none;
+  }
+
+  .orders-table td::before { 
+    position: absolute;
+    left: 12px;
+    width: 40%; 
+    white-space: nowrap;
+    content: attr(data-label);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  /* Calendar Mobile */
+  .calendar-wrapper {
+    padding: 15px;
+    border-radius: 16px;
+  }
+
+  .cal-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+    margin-bottom: 25px;
+  }
+
+  .cal-title {
+    font-size: 1.4rem;
+  }
+
+  .cal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cal-day-name {
+    display: none;
+  }
+
+  .cal-day-cell {
+    min-height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    gap: 15px;
+  }
+
+  .cal-day-cell.prev-month,
+  .cal-day-cell.next-month {
+    display: none; /* Ukrywamy dni z innych miesięcy na mobile dla przejrzystości */
+  }
+
+  .day-number {
+    margin-bottom: 0;
+    font-size: 1.1rem;
+    min-width: 25px;
+  }
+
+  .cal-event {
+    flex: 1;
+    margin: 0;
+    font-size: 0.75rem;
+  }
 }

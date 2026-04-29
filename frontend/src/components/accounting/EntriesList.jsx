@@ -301,24 +301,22 @@ export default function EntriesList({ type }) {
                   const monthReady = monthEntries.filter(x => x.is_ready).length;
 
                   acc.push(
-                    <tr key={`header-${mKey}`} style={{ backgroundColor: 'var(--bg-gray)', borderBottom: '2px solid var(--border-color)', borderTop: '2px solid var(--border-color)' }}>
-                       <td colSpan="5" style={{ padding: '12px 15px', fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--primary-color)' }}>
+                    <tr key={`header-${mKey}`} className="month-summary-row">
+                       <td colSpan="5" className="month-summary-label">
                          📅 {d.toLocaleString('pl-PL', { month: 'long', year: 'numeric' }).toUpperCase()} 
-                         <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '10px', fontWeight: 'normal' }}>
+                         <span className="month-summary-sub">
                            (W teczce: {monthReady} / {monthEntries.length})
                          </span>
                        </td>
-                       <td className="text-right" style={{ fontWeight: 'bold' }}>{sumNet.toFixed(2)} zł</td>
-                       <td className="text-right" style={{ fontWeight: 'bold' }}>{sumVat.toFixed(2)} zł</td>
-                       <td className="text-right" style={{ fontWeight: 'bold' }}>{sumGross.toFixed(2)} zł</td>
-                       <td></td>
+                       <td data-label="Suma Netto" className="text-right month-sum">{sumNet.toFixed(2)} zł</td>
+                       <td data-label="Suma VAT" className="text-right month-sum">{sumVat.toFixed(2)} zł</td>
+                       <td data-label="Suma Brutto" className="text-right month-sum">{sumGross.toFixed(2)} zł</td>
+                       <td className="month-sum-actions"></td>
                     </tr>
                   );
-                }
-
                 acc.push(
                   <tr key={e.id} className={e.is_ready ? "row-ready" : ""}>
-                    <td style={{ textAlign: 'center' }}>
+                    <td data-label="Status" style={{ textAlign: 'center' }}>
                        <button 
                         className={`btn-ready-toggle ${e.is_ready ? 'active' : ''}`}
                         onClick={() => handleToggleReady(e)}
@@ -327,18 +325,18 @@ export default function EntriesList({ type }) {
                          {e.is_ready ? "✅" : "⭕"}
                        </button>
                     </td>
-                    <td>{new Date(e.date).toLocaleDateString()}</td>
-                    <td><strong>{e.number}</strong></td>
-                    <td>{e.contractor}</td>
-                    <td>
+                    <td data-label="Data">{new Date(e.date).toLocaleDateString()}</td>
+                    <td data-label="Numer"><strong>{e.number}</strong></td>
+                    <td data-label="Kontrahent">{e.contractor}</td>
+                    <td data-label="Kategoria">
                         <span className="badge-category">{e.category}</span>
                         {e.is_car_cost && <span className="badge-car" title="Auto (75% / 50%)">🚗</span>}
                     </td>
-                    <td className="text-right">{e.net_amount} zł</td>
-                    <td className="text-right">{e.vat_amount} zł ({e.vat_rate}%)</td>
-                    <td className="text-right"><strong>{e.gross_amount} zł</strong></td>
-                    <td className="text-right">
-                      <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                    <td data-label="Netto" className="text-right">{e.net_amount} zł</td>
+                    <td data-label="VAT" className="text-right">{e.vat_amount} zł ({e.vat_rate}%)</td>
+                    <td data-label="Brutto" className="text-right"><strong>{e.gross_amount} zł</strong></td>
+                    <td data-label="Akcje" className="text-right">
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                         <button className="btn-table" onClick={() => setEditingEntry(e)}>Edytuj</button>
                         <button className="btn-table btn-delete" onClick={() => handleDelete(e.id)}>Usuń</button>
                       </div>

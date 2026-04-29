@@ -194,37 +194,37 @@ export default function ClientsList() {
             </thead>
             <tbody>
               {filteredClients.map(client => (
-                <tr key={client.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(client.id)}
-                      onChange={() => toggleSelect(client.id)}
-                    />
-                  </td>
-                  <td>
-                    <strong>{client.first_name} {client.last_name}</strong>
-                    {client.company_name && (
-                      <div className="company-subtext">{client.company_name}</div>
-                    )}
-                  </td>
-                  <td>
-                    <div>{client.email}</div>
-                    <div style={{ fontSize: '0.85em', color: '#666' }}>{client.phone}</div>
-                  </td>
-                  <td>
-                    <span className={`badge ${client.type === 'firma' ? 'badge-company' : 'badge-person'}`}>
-                      {client.type === 'firma' ? 'Firma' : 'Osoba'}
-                    </span>
-                  </td>
-                  <td className="actions-cell">
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
-                      <button className="btn-table" onClick={() => setDetailsId(client.id)}>Podgląd</button>
-                      <button className="btn-table" onClick={() => setEditingClient(client)}>Edytuj</button>
-                      <button className="btn-table btn-delete" onClick={() => handleDelete(client.id)}>Usuń</button>
-                    </div>
-                  </td>
-                </tr>
+                  <tr key={client.id}>
+                    <td data-label="Zaznacz">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(client.id)}
+                        onChange={() => toggleSelect(client.id)}
+                      />
+                    </td>
+                    <td data-label="Klient">
+                      <strong>{client.first_name} {client.last_name}</strong>
+                      {client.company_name && (
+                        <div className="company-subtext">{client.company_name}</div>
+                      )}
+                    </td>
+                    <td data-label="Kontakt">
+                      <div>{client.email}</div>
+                      <div style={{ fontSize: '0.85em', color: '#666' }}>{client.phone}</div>
+                    </td>
+                    <td data-label="Typ">
+                      <span className={`badge ${client.type === 'firma' ? 'badge-company' : 'badge-person'}`}>
+                        {client.type === 'firma' ? 'Firma' : 'Osoba'}
+                      </span>
+                    </td>
+                    <td data-label="Akcje" className="actions-cell">
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                        <button className="btn-table" onClick={() => setDetailsId(client.id)}>Podgląd</button>
+                        <button className="btn-table" onClick={() => setEditingClient(client)}>Edytuj</button>
+                        <button className="btn-table btn-delete" onClick={() => handleDelete(client.id)}>Usuń</button>
+                      </div>
+                    </td>
+                  </tr>
               ))}
               {filteredClients.length === 0 && (
                 <tr>

@@ -47,7 +47,8 @@
   background: var(--bg-card);
   border-radius: 16px;
   box-shadow: var(--card-shadow);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-color);
   margin-bottom: 32px;
 }
@@ -239,4 +240,66 @@ body.dark-mode .link-btn {
   color: white;
   border-color: var(--danger-color);
   box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.4);
+}
+
+@media (max-width: 768px) {
+  .table-container {
+    background: none;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .clients-table, 
+  .clients-table thead, 
+  .clients-table tbody, 
+  .clients-table th, 
+  .clients-table td, 
+  .clients-table tr { 
+    display: block; 
+  }
+
+  .clients-table thead tr { 
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .clients-table tr {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    padding: 12px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .clients-table td { 
+    border: none;
+    border-bottom: 1px solid var(--bg-gray);
+    position: relative;
+    padding-left: 45% !important; 
+    text-align: right;
+    min-height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .clients-table td:last-child {
+    border-bottom: none;
+  }
+
+  .clients-table td::before { 
+    position: absolute;
+    left: 12px;
+    width: 40%; 
+    white-space: nowrap;
+    content: attr(data-label);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: left;
+  }
 }

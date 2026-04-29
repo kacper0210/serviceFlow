@@ -159,28 +159,27 @@ export default function OrdersList() {
                   const client = clients.find(c => c.id === order.client_id);
                   return (
                     <tr key={order.id}>
-                      <td>#{order.id}</td>
-                      <td><strong>{order.title}</strong></td>
-                      <td>
+                      <td data-label="ID">#{order.id}</td>
+                      <td data-label="Tytuł"><strong>{order.title}</strong></td>
+                      <td data-label="Klient">
                         {client ? `${client.first_name} ${client.last_name}` : "Nieznany"}
                       </td>
-                      <td>
+                      <td data-label="Termin">
                         {order.deadline ? new Date(order.deadline).toLocaleDateString() : "-"}
                       </td>
-                      <td>{order.price ? `${order.price} zł` : "-"}</td>
-                      <td>
+                      <td data-label="Cena">{order.price ? `${order.price} zł` : "-"}</td>
+                      <td data-label="Status">
                         <span className={`status-badge status-${order.status}`}>
                           {order.status.replace("_", " ")}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Akcje">
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
                           <button className="btn-table" onClick={() => setDetailsId(order.id)}>Podgląd</button>
                           <button className="btn-table" onClick={() => setEditOrder(order)}>Edytuj</button>
                           <button className="btn-table btn-delete" onClick={() => handleDelete(order.id)}>Usuń</button>
                         </div>
                       </td>
-
                     </tr>
                   );
                 })}

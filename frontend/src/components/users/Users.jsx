@@ -176,9 +176,9 @@ export default function Users() {
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td>#{u.id}</td>
-                  <td><strong>{u.email}</strong></td>
-                  <td>
+                  <td data-label="ID">#{u.id}</td>
+                  <td data-label="Email"><strong>{u.email}</strong></td>
+                  <td data-label="Rola">
                     <select
                       value={u.role}
                       onChange={(e) => updateUser(u.id, { role: e.target.value })}
@@ -189,7 +189,7 @@ export default function Users() {
                       <option value="admin">Admin</option>
                     </select>
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <label className="users-checkbox-label" style={{ fontSize: '0.9em' }}>
                       <input
                         type="checkbox"
@@ -199,7 +199,7 @@ export default function Users() {
                       {u.is_active ? "Aktywny" : "Zablokowany"}
                     </label>
                   </td>
-                  <td>
+                  <td data-label="Akcje">
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         onClick={() => handleChangePassword(u.id)}

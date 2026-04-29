@@ -325,3 +325,89 @@
   padding-right: 15px;
 }
 
+@media (max-width: 768px) {
+  .table-responsive-container {
+    overflow: visible;
+  }
+
+  .table-accounting-modern,
+  .table-accounting-modern thead,
+  .table-accounting-modern tbody,
+  .table-accounting-modern th,
+  .table-accounting-modern td,
+  .table-accounting-modern tr {
+    display: block;
+  }
+
+  .table-accounting-modern thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .table-accounting-modern tr {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    padding: 12px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .month-summary-row {
+    background: var(--bg-gray) !important;
+    border: 2px solid var(--primary-color) !important;
+    padding: 15px !important;
+  }
+
+  .month-summary-label {
+    display: block !important;
+    text-align: center !important;
+    font-size: 1.1rem !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    margin-bottom: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .table-accounting-modern td {
+    border: none !important;
+    border-bottom: 1px solid var(--bg-gray) !important;
+    position: relative;
+    padding-left: 45% !important;
+    text-align: right !important;
+    min-height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .table-accounting-modern td:last-child {
+    border-bottom: none !important;
+  }
+
+  .table-accounting-modern td::before {
+    position: absolute;
+    left: 12px;
+    width: 40%;
+    white-space: nowrap;
+    content: attr(data-label);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  /* Wyjątek dla nagłówka miesiąca */
+  .month-summary-row td::before {
+    content: "" !important;
+  }
+  .month-summary-row td {
+    padding-left: 10px !important;
+    text-align: right !important;
+  }
+}
+
