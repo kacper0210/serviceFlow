@@ -281,15 +281,59 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
     <div className="ksef-integration-wrapper" style={{ animation: "fadeIn 0.25s ease-out", paddingTop: "8px" }}>
       {/* Alert banners */}
       {errorMessage && (
-        <div className={`ksef-alert ${errorMessage.includes("429") || errorMessage.includes("limit") || errorMessage.includes("odczekania") ? "warning" : "error"}`}>
-          <span style={{ fontSize: "1.1rem" }}>{errorMessage.includes("429") || errorMessage.includes("limit") ? "⏱️" : "⚠️"}</span>
-          <span>{errorMessage}</span>
+        <div 
+          className={`ksef-alert ${errorMessage.includes("429") || errorMessage.includes("limit") || errorMessage.includes("odczekania") || errorMessage.includes("bazy") ? "warning" : "error"}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+            <span style={{ fontSize: "1.1rem" }}>{errorMessage.includes("429") || errorMessage.includes("limit") || errorMessage.includes("bazy") ? "⏱️" : "⚠️"}</span>
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMessage("")}
+            title="Zamknij powiadomienie"
+            style={{
+              background: "rgba(0,0,0,0.05)",
+              border: "none",
+              borderRadius: "4px",
+              padding: "4px 8px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "inherit"
+            }}
+          >
+            ✕ Zamknij
+          </button>
         </div>
       )}
       {successMessage && (
-        <div className="ksef-alert success">
-          <span style={{ fontSize: "1.1rem" }}>✅</span>
-          <span>{successMessage}</span>
+        <div 
+          className="ksef-alert success"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+            <span style={{ fontSize: "1.1rem" }}>✅</span>
+            <span>{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage("")}
+            title="Zamknij powiadomienie"
+            style={{
+              background: "rgba(0,0,0,0.05)",
+              border: "none",
+              borderRadius: "4px",
+              padding: "4px 8px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "inherit"
+            }}
+          >
+            ✕ Zamknij
+          </button>
         </div>
       )}
 
