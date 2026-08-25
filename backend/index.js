@@ -11,6 +11,105 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Automatic DB schema migration on startup for cloud DB (Neon PostgreSQL)
+async function ensureDbTablesExist() {
+  try {
+    console.log("[DB Migration] Verifying KSeF, Offers, and Accounting tables in PostgreSQL database...");
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ksef_settings (
+        id SERIAL PRIMARY KEY,
+        nip VARCHAR(50),
+        encrypted_token TEXT,
+        iv VARCHAR(100),
+        tag VARCHAR(100),
+        environment VARCHAR(20) DEFAULT 'mock',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        encrypted_access_token TEXT,
+        access_token_iv VARCHAR(100),
+        access_token_tag VARCHAR(100),
+        encrypted_refresh_token TEXT,
+        refresh_token_iv VARCHAR(100),
+        refresh_token_tag VARCHAR(100),
+        access_token_expires_at BIGINT,
+        last_sync_at TIMESTAMP
+      );
+
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS encrypted_access_token TEXT;
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS access_token_iv VARCHAR(100);
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS access_token_tag VARCHAR(100);
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS encrypted_refresh_token TEXT;
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS refresh_token_iv VARCHAR(100);
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS refresh_token_tag VARCHAR(100);
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS access_token_expires_at BIGINT;
+      ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ksef_invoices (
+        id SERIAL PRIMARY KEY,
+        ksef_reference_number VARCHAR(100) UNIQUE,
+        invoice_number VARCHAR(100) NOT NULL,
+        contractor_name VARCHAR(255) NOT NULL,
+        contractor_nip VARCHAR(50) NOT NULL,
+        date DATE NOT NULL,
+        net_amount DECIMAL(12, 2) NOT NULL,
+        vat_rate INTEGER DEFAULT 23,
+        vat_amount DECIMAL(12, 2) NOT NULL,
+        gross_amount DECIMAL(12, 2) NOT NULL,
+        is_imported BOOLEAN DEFAULT FALSE,
+        is_car_cost BOOLEAN DEFAULT FALSE,
+        suggested_category VARCHAR(100),
+        is_sales BOOLEAN DEFAULT FALSE,
+        subject_type VARCHAR(20) DEFAULT 'Subject2',
+        xml_content TEXT,
+        accounting_entry_id INTEGER REFERENCES accounting_entries(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS is_car_cost BOOLEAN DEFAULT FALSE;
+      ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS suggested_category VARCHAR(100);
+      ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE;
+      ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS subject_type VARCHAR(20) DEFAULT 'Subject2';
+      ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS xml_content TEXT;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS offers (
+        id SERIAL PRIMARY KEY,
+        offer_number VARCHAR(50) UNIQUE NOT NULL,
+        client_name VARCHAR(255) NOT NULL,
+        client_nip VARCHAR(50),
+        client_address TEXT,
+        title VARCHAR(255) NOT NULL,
+        total_net DECIMAL(12, 2) NOT NULL,
+        total_gross DECIMAL(12, 2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'draft',
+        valid_until DATE,
+        created_by VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS offer_items (
+        id SERIAL PRIMARY KEY,
+        offer_id INTEGER REFERENCES offers(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        quantity DECIMAL(10, 2) DEFAULT 1,
+        unit_price DECIMAL(12, 2) NOT NULL,
+        vat_rate INTEGER DEFAULT 23
+      );
+    `);
+
+    console.log("[DB Migration] All required DB tables verified successfully!");
+  } catch (err) {
+    console.error("[DB Migration Error] Failed to auto-migrate DB tables:", err);
+  }
+}
+
+ensureDbTablesExist();
+
 // Root route to confirm server status
 app.get("/", (req, res) => {
   res.send("Serwer ServiceFlow działa poprawnie! Korzystaj z endpointów /api.");
