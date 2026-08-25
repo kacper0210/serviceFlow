@@ -10,20 +10,45 @@ export default function OrdersList() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [filterStatus, setFilterStatus] = useState("");
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [filterMonth, setFilterMonth] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState("list");
 
+  const STATUS_OPTIONS = [
+    { key: 'nowe', label: 'Nowe', color: '#3b82f6', badgeBg: 'rgba(59, 130, 246, 0.15)' },
+    { key: 'w_trakcie', label: 'W realizacji', color: '#f59e0b', badgeBg: 'rgba(245, 158, 11, 0.15)' },
+    { key: 'zakonczone', label: 'Zakończone', color: '#10b981', badgeBg: 'rgba(16, 185, 129, 0.15)' },
+    { key: 'wstrzymane', label: 'Wstrzymane', color: '#ef4444', badgeBg: 'rgba(239, 68, 68, 0.15)' }
+  ];
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const statusParam = params.get("status");
     if (statusParam) {
-      setFilterStatus(statusParam);
+      const parsed = statusParam.split(',').map(s => s.trim()).filter(Boolean);
+      setSelectedStatuses(parsed);
     }
   }, [location.search]);
+
+  const toggleStatusFilter = (statusKey) => {
+    setSelectedStatuses(prev => {
+      if (prev.includes(statusKey)) {
+        return prev.filter(k => k !== statusKey);
+      } else {
+        return [...prev, statusKey];
+      }
+    });
+    setCurrentPage(1);
+  };
+
+  const clearStatusFilter = () => {
+    setSelectedStatuses([]);
+    setCurrentPage(1);
+  };
 
   const availableMonths = useMemo(() => {
     const monthsSet = new Set();
@@ -185,12 +210,16 @@ export default function OrdersList() {
   };
 
   const filteredOrders = orders.filter(order => {
-    if (filterStatus) {
+    if (selectedStatuses.length > 0) {
       const st = (order.status || "").toLowerCase();
-      if (filterStatus === "zakonczone" && !(st === "completed" || st.includes("zako"))) return false;
-      if (filterStatus === "w_trakcie" && !(st === "in_progress" || st.includes("trakcie"))) return false;
-      if (filterStatus === "nowe" && !(st === "new" || st.includes("now"))) return false;
-      if (filterStatus === "wstrzymane" && !(st === "on_hold" || st.includes("wstrzyma"))) return false;
+      const matchesAny = selectedStatuses.some(statusKey => {
+        if (statusKey === "zakonczone" && (st === "completed" || st.includes("zako"))) return true;
+        if (statusKey === "w_trakcie" && (st === "in_progress" || st.includes("trakcie"))) return true;
+        if (statusKey === "nowe" && (st === "new" || st.includes("now"))) return true;
+        if (statusKey === "wstrzymane" && (st === "on_hold" || st.includes("wstrzyma"))) return true;
+        return false;
+      });
+      if (!matchesAny) return false;
     }
 
     if (filterMonth) {
@@ -324,20 +353,111 @@ export default function OrdersList() {
               </option>
             ))}
           </select>
-          <select
-            className="filter-input filter-input-status"
-            value={filterStatus}
-            onChange={e => {
-              setFilterStatus(e.target.value);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="">Wszystkie statusy</option>
-            <option value="nowe">Nowe</option>
-            <option value="w_trakcie">W realizacji</option>
-            <option value="zakonczone">Zakończone</option>
-            <option value="wstrzymane">Wstrzymane</option>
-          </select>
+          {/* Multi-Select Status Dropdown Component */}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              type="button"
+              className="filter-input filter-input-status-multi"
+              onClick={() => setShowStatusDropdown(prev => !prev)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                minWidth: '160px',
+                height: '40px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: selectedStatuses.length > 0 ? 'var(--primary-light)' : 'var(--input-bg)',
+                borderColor: selectedStatuses.length > 0 ? 'var(--primary-color)' : 'var(--border-color)',
+                color: selectedStatuses.length > 0 ? 'var(--primary-color)' : 'var(--input-text)',
+                fontWeight: selectedStatuses.length > 0 ? 600 : 400
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedStatuses.length === 0 && "🏷️ Wszystkie statusy"}
+                {selectedStatuses.length === 1 && `🏷️ ${STATUS_OPTIONS.find(o => o.key === selectedStatuses[0])?.label || selectedStatuses[0]}`}
+                {selectedStatuses.length > 1 && `🏷️ Wybrano (${selectedStatuses.length})`}
+              </span>
+              <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{showStatusDropdown ? '▲' : '▼'}</span>
+            </button>
+
+            {showStatusDropdown && (
+              <>
+                <div 
+                  onClick={() => setShowStatusDropdown(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '6px',
+                  width: '210px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '10px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.18)',
+                  padding: '12px',
+                  zIndex: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid var(--border-color)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                    <span>Filtruj wg statusu</span>
+                    {selectedStatuses.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearStatusFilter}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, padding: 0 }}
+                      >
+                        Wyczyść
+                      </button>
+                    )}
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', padding: '4px 6px', borderRadius: '6px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedStatuses.length === 0}
+                      onChange={clearStatusFilter}
+                    />
+                    <span>Wszystkie statusy</span>
+                  </label>
+
+                  {STATUS_OPTIONS.map(opt => {
+                    const isChecked = selectedStatuses.includes(opt.key);
+                    return (
+                      <label 
+                        key={opt.key}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          cursor: 'pointer', 
+                          fontSize: '0.88rem', 
+                          padding: '6px 8px', 
+                          borderRadius: '6px',
+                          background: isChecked ? opt.badgeBg : 'transparent',
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleStatusFilter(opt.key)}
+                        />
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: opt.color }} />
+                        <span style={{ fontWeight: isChecked ? 600 : 400 }}>{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
           <select
             className="filter-input filter-input-sort"
             value={`${sortField}_${sortDirection}`}
@@ -365,6 +485,48 @@ export default function OrdersList() {
         </div>
 
       </div>
+
+      {/* Active Multi-Status Filter Badges / Chips */}
+      {selectedStatuses.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '16px', marginTop: '-10px', padding: '0 4px' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktywne statusy:</span>
+          {selectedStatuses.map(statusKey => {
+            const opt = STATUS_OPTIONS.find(o => o.key === statusKey);
+            return (
+              <button
+                key={statusKey}
+                type="button"
+                onClick={() => toggleStatusFilter(statusKey)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: opt?.badgeBg || 'var(--primary-light)',
+                  border: '1px solid var(--border-color)',
+                  color: opt?.color || 'var(--primary-color)',
+                  padding: '4px 10px',
+                  borderRadius: '16px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: opt?.color }} />
+                <span>{opt?.label || statusKey}</span>
+                <span style={{ opacity: 0.7, marginLeft: '2px', fontWeight: 700 }}>✕</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={clearStatusFilter}
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', padding: '2px 6px', fontWeight: 500 }}
+          >
+            Wyczyść wszystkie
+          </button>
+        </div>
+      )}
 
       <div className="table-container">
         {loading ? (
