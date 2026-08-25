@@ -776,7 +776,29 @@ app.post("/api/accounting/ksef/sync", checkAuth, asyncHandler(async (req, res) =
     res.json({ success: true, invoices, last_sync_at: new Date() });
   } catch (err) {
     console.error("KSeF sync failed:", err);
-    return res.status(502).json({ error: `Błąd komunikacji z KSeF: ${err.message}` });
+
+    // Fallback: Fetch cached invoices from DB for this period
+    const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const cachedRes = await pool.query(
+      `SELECT * FROM ksef_invoices 
+       WHERE date >= $1 AND date <= $2 
+       ORDER BY date DESC, id DESC`,
+      [dateFrom, dateTo]
+    );
+
+    const isRateLimit = err.message?.includes("429") || err.message?.includes("limit") || err.message?.includes("Rate Limit") || err.message?.includes("wymaga");
+
+    return res.json({
+      success: false,
+      invoices: cachedRes.rows,
+      last_sync_at: settings?.last_sync_at,
+      warning: isRateLimit
+        ? `⏱️ Bramka KSeF nakłada limit zapytań (Rate Limit). Wyświetlono faktury z lokalnej bazy danych (${cachedRes.rows.length} szt.). Zsynchronizuje się po upływie podanego czasu.`
+        : `Błąd połączenia z KSeF (${err.message}). Wyświetlono faktury z lokalnej bazy.`
+    });
   }
 }));
 
