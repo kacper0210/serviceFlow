@@ -265,7 +265,7 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                 const amounts = calculateItemAmounts(item);
                 return (
                   <tr key={index} className="item-row">
-                    <td>
+                    <td data-label="Nazwa usługi / produktu *">
                       <input
                         type="text"
                         className="form-input"
@@ -276,7 +276,7 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                         required
                       />
                     </td>
-                    <td>
+                    <td data-label="Ilość">
                       <input
                         type="number"
                         className="form-input"
@@ -284,10 +284,10 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                         step="any"
                         value={item.quantity}
                         onChange={e => handleItemChange(index, "quantity", e.target.value)}
-                        style={{ padding: '8px 12px', fontSize: '0.9rem', textAlign: 'center' }}
+                        style={{ padding: '8px 12px', fontSize: '0.9rem' }}
                       />
                     </td>
-                    <td>
+                    <td data-label="Jednostka">
                       <select
                         className="form-select"
                         value={item.unit}
@@ -301,8 +301,8 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                         <option value="kpl.">kpl.</option>
                       </select>
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <td data-label="Cena netto (zł)">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <input
                           type="number"
                           className="form-input"
@@ -310,12 +310,12 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                           step="0.01"
                           value={item.unit_price_net}
                           onChange={e => handleItemChange(index, "unit_price_net", e.target.value)}
-                          style={{ padding: '8px 12px', fontSize: '0.9rem', textAlign: 'right' }}
+                          style={{ padding: '8px 12px', fontSize: '0.9rem' }}
                         />
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>zł</span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>zł</span>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Stawka VAT">
                       <select
                         className="form-select"
                         value={item.vat_rate}
@@ -328,10 +328,10 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                         <option value="0">0%</option>
                       </select>
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: '600', paddingRight: '10px', fontSize: '0.9rem' }}>
+                    <td data-label="Suma brutto" className="gross-sum-cell" style={{ fontWeight: '600', paddingRight: '10px', fontSize: '0.95rem' }}>
                       {amounts.gross.toFixed(2)} zł
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td data-label="Usuń" style={{ textAlign: 'center' }}>
                       <button
                         type="button"
                         className="btn-remove-item"
@@ -340,7 +340,7 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
                         disabled={items.length === 1}
                         style={{ opacity: items.length === 1 ? 0.3 : 1, cursor: items.length === 1 ? 'not-allowed' : 'pointer' }}
                       >
-                        ✕
+                        ✕ Usuń pozycję
                       </button>
                     </td>
                   </tr>

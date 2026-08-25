@@ -546,4 +546,87 @@ body.dark-mode .page {
     overflow-x: auto;
     white-space: nowrap;
   }
+
+  /* Form Item Addition Cards on Mobile */
+  .items-form-table,
+  .items-form-table thead,
+  .items-form-table tbody,
+  .items-form-table tr,
+  .items-form-table td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .items-form-table thead {
+    display: none;
+  }
+
+  .items-form-table tr.item-row {
+    background: var(--bg-gray);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+  }
+
+  .items-form-table td {
+    padding: 0 !important;
+    border: none !important;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  .items-form-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 5px;
+  }
+
+  .items-form-table td .form-input,
+  .items-form-table td .form-select {
+    width: 100% !important;
+    font-size: 0.95rem !important;
+    padding: 10px 12px !important;
+    border-radius: 6px !important;
+  }
+
+  .items-form-table td.gross-sum-cell {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    padding: 10px 12px !important;
+    border-radius: 6px;
+    color: #10b981;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+  }
+
+  .items-form-table td[data-label="Usuń"] {
+    align-items: flex-end;
+    margin-top: 4px;
+  }
+
+  .items-form-table td[data-label="Usuń"]::before {
+    display: none;
+  }
+
+  .items-form-table td[data-label="Usuń"] button {
+    width: 100%;
+    padding: 8px 14px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
 }

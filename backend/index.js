@@ -95,6 +95,13 @@ async function ensureDbTablesExist() {
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS description TEXT;
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS notes TEXT;
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS total_vat DECIMAL(12, 2) DEFAULT 0.00;
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS offer_number VARCHAR(50);
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_nip VARCHAR(50);
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_address TEXT;
+      
+      ALTER TABLE offers ALTER COLUMN offer_number DROP NOT NULL;
+      ALTER TABLE offers ALTER COLUMN client_name DROP NOT NULL;
 
       CREATE TABLE IF NOT EXISTS offer_items (
         id SERIAL PRIMARY KEY,
@@ -509,11 +516,39 @@ app.post("/api/offers", checkAuth, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    let clientName = null;
+    let clientNip = null;
+    if (client_id) {
+      const cRes = await client.query("SELECT first_name, last_name, company_name, nip FROM clients WHERE id = $1", [client_id]);
+      if (cRes.rows.length > 0) {
+        const c = cRes.rows[0];
+        clientName = c.company_name || `${c.first_name || ''} ${c.last_name || ''}`.trim();
+        clientNip = c.nip;
+      }
+    }
+
+    const offerNumber = `OFR/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
     
     const offerRes = await client.query(
-      `INSERT INTO offers (client_id, title, description, status, valid_until, notes, total_net, total_vat, total_gross)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [client_id ? parseInt(client_id) : null, title, description, status || 'robocza', valid_until || null, notes, total_net || 0, total_vat || 0, total_gross || 0]
+      `INSERT INTO offers (
+         client_id, title, description, status, valid_until, notes, 
+         total_net, total_vat, total_gross, offer_number, client_name, client_nip
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [
+        client_id ? parseInt(client_id) : null,
+        title || 'Nowa oferta',
+        description || '',
+        status || 'robocza',
+        valid_until || null,
+        notes || '',
+        total_net || 0,
+        total_vat || 0,
+        total_gross || 0,
+        offerNumber,
+        clientName || 'Klient',
+        clientNip || ''
+      ]
     );
     const offer = offerRes.rows[0];
     
@@ -523,7 +558,18 @@ app.post("/api/offers", checkAuth, asyncHandler(async (req, res) => {
         const itemRes = await client.query(
           `INSERT INTO offer_items (offer_id, title, description, quantity, unit, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-          [offer.id, item.title, item.description, item.quantity || 1, item.unit || 'szt.', item.unit_price_net || 0, item.vat_rate || 23, item.net_amount || 0, item.vat_amount || 0, item.gross_amount || 0]
+          [
+            offer.id, 
+            item.title || 'Pozycja', 
+            item.description || '', 
+            item.quantity || 1, 
+            item.unit || 'szt.', 
+            item.unit_price_net || 0, 
+            item.vat_rate || 23, 
+            item.net_amount || 0, 
+            item.vat_amount || 0, 
+            item.gross_amount || 0
+          ]
         );
         createdItems.push(itemRes.rows[0]);
       }
@@ -533,7 +579,8 @@ app.post("/api/offers", checkAuth, asyncHandler(async (req, res) => {
     res.status(201).json({ ...offer, items: createdItems });
   } catch (err) {
     await client.query('ROLLBACK');
-    throw err;
+    console.error("Error creating offer:", err);
+    res.status(500).json({ error: "Błąd podczas tworzenia oferty: " + err.message });
   } finally {
     client.release();
   }
