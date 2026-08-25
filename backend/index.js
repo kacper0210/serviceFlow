@@ -130,6 +130,8 @@ async function ensureDbTablesExist() {
 
       ALTER TABLE offer_items ALTER COLUMN unit_price DROP NOT NULL;
       ALTER TABLE offer_items ALTER COLUMN unit_price_net DROP NOT NULL;
+
+      ALTER TABLE orders ALTER COLUMN client_id DROP NOT NULL;
     `);
 
     console.log("[DB Migration] All required DB tables verified successfully!");
@@ -550,23 +552,41 @@ app.delete("/api/orders/:orderId/costs/:costId", checkAuth, asyncHandler(async (
 
 
 app.post("/api/orders", checkAuth, asyncHandler(async (req, res) => {
-  const fields = ["title", "description", "status", "price", "notes", "client_id", "deadline"];
-  const sanitize = (val) => (val === "" || val === undefined || val === null) ? null : val;
+  try {
+    const { title, description, status, price, notes, client_id, deadline } = req.body;
+    
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ error: "Tytuł zlecenia jest wymagany" });
+    }
 
-  const values = fields.map(k => {
-    let val = req.body[k];
-    if (k === "status") return val || "nowe";
-    if (k === "deadline" || k === "price") return sanitize(val);
-    if (k === "client_id") return val ? parseInt(val) : null;
-    return val;
-  });
-  const placeholders = fields.map((_, i) => `$${i + 1}`).join(", ");
+    let parsedClientId = null;
+    if (client_id && !isNaN(parseInt(client_id))) {
+      parsedClientId = parseInt(client_id);
+    }
 
-  const { rows } = await pool.query(
-    `INSERT INTO orders (${fields.join(", ")}) VALUES (${placeholders}) RETURNING *`,
-    values
-  );
-  res.status(201).json(rows[0]);
+    let parsedPrice = null;
+    if (price !== "" && price !== null && price !== undefined && !isNaN(parseFloat(price))) {
+      parsedPrice = parseFloat(price);
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO orders (title, description, status, price, notes, client_id, deadline)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        String(title).trim(),
+        description || null,
+        status || "nowe",
+        parsedPrice,
+        notes || null,
+        parsedClientId,
+        deadline || null
+      ]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("Error creating order:", err);
+    res.status(500).json({ error: "Błąd podczas tworzenia zlecenia: " + err.message });
+  }
 }));
 
 app.put("/api/orders/:id", checkAuth, asyncHandler(async (req, res) => {
