@@ -53,7 +53,36 @@ export default function ClientItem({ client, isEditing, onEdit, onCancelEdit, on
 
             <div className="info-item">
               <span className="icon">📞</span>
-              <span>{client.phone}</span>
+              {client.phone ? (
+                <a 
+                  href={`tel:${client.phone.replace(/\s+/g, '')}`}
+                  className="phone-call-link"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="Zadzwoń do klienta"
+                >
+                  {client.phone} 
+                  <span style={{
+                    fontSize: '0.72rem',
+                    background: '#22c55e',
+                    color: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: 700
+                  }}>
+                    📞 Zadzwoń
+                  </span>
+                </a>
+              ) : (
+                <span style={{ color: 'var(--text-muted)' }}>Brak telefonu</span>
+              )}
             </div>
 
             <div className="info-item">

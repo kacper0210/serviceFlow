@@ -89,24 +89,24 @@ export default function TaxDashboard() {
         </select>
       </div>
 
-      <div style={{ marginBottom: '20px', background: 'white', padding: '15px', borderRadius: '12px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <label style={{ fontWeight: 'bold', margin: 0 }}>VAT przeniesiony z zeszłego miesiąca:</label>
+      <div style={{ marginBottom: '20px', background: 'var(--bg-card)', padding: '14px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', gap: '15px', alignItems: 'center' }}>
+        <label style={{ fontSize: '0.88rem', fontWeight: 600, margin: 0, color: 'var(--text-main)' }}>VAT przeniesiony z zeszłego miesiąca:</label>
         <input 
           type="number" 
           value={carriedVatInput} 
           onChange={e => setCarriedVatInput(e.target.value)} 
           className="form-input"
-          style={{ width: '120px', padding: '5px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+          style={{ width: '120px', padding: '6px 12px' }}
         />
-        <button onClick={saveCarriedVat} className="btn-primary" style={{ padding: '6px 15px', borderRadius: '6px', cursor: 'pointer' }}>Zapisz</button>
+        <button onClick={saveCarriedVat} className="btn-primary" style={{ padding: '6px 15px', borderRadius: '4px', cursor: 'pointer' }}>Zapisz</button>
       </div>
 
       <div className="stats-grid">
         <div className="stat-card">
           <label>Przychód</label>
-          <div className="stat-value text-primary">{stats?.revenue?.net || 0} zł <span style={{fontSize: '0.6em', color: '#666'}}>netto</span></div>
-          <div className="stat-value text-primary" style={{fontSize: '1.2rem', marginTop: '5px'}}>{stats?.revenue?.gross || 0} zł <span style={{fontSize: '0.6em', color: '#666'}}>brutto</span></div>
-          <div className="stat-sub" style={{marginTop: '8px'}}>VAT: +{stats?.revenue?.vat || 0} zł</div>
+          <div className="stat-value text-primary">{stats?.revenue?.net || 0} zł <span style={{fontSize: '0.6em', color: 'var(--text-muted)'}}>netto</span></div>
+          <div className="stat-value text-primary" style={{fontSize: '1.2rem', marginTop: '4px'}}>{stats?.revenue?.gross || 0} zł <span style={{fontSize: '0.6em', color: 'var(--text-muted)'}}>brutto</span></div>
+          <div className="stat-sub" style={{marginTop: '4px'}}>VAT: +{stats?.revenue?.vat || 0} zł</div>
         </div>
         <div className="stat-card">
           <label>Koszty (KPiR)</label>
@@ -126,7 +126,13 @@ export default function TaxDashboard() {
       <h3 className="section-title">Prognozowane Podatki / Składki</h3>
       <div className="taxes-grid">
         <div className="tax-item card-vat">
-          <div className="tax-icon">🧾</div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--primary-color)' }}>
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <line x1="10" y1="9" x2="8" y2="9"/>
+          </svg>
           <div className="tax-info">
             <span className="tax-label">VAT do zapłaty</span>
             <span className="tax-amount">{stats?.taxes?.vat || 0} zł</span>
@@ -138,15 +144,24 @@ export default function TaxDashboard() {
           </div>
         </div>
         <div className="tax-item card-pit">
-          <div className="tax-icon">📈</div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: '#10b981' }}>
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
           <div className="tax-info">
-            <span className="tax-label">PIT (Skala 12%/32%)</span>
+            <span className="tax-label">PIT (Skala z Kwotą Wolną 30k zł)</span>
             <span className="tax-amount">{stats?.taxes?.pit || 0} zł</span>
+            <span style={{fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block'}}>
+              Zwolnienie 2 500 zł/mies., próg 32% powyżej 10 000 zł/mies.
+            </span>
           </div>
         </div>
 
         <div className="tax-item card-zus">
-          <div className="tax-icon">🏥</div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: '#ef4444' }}>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7s0 6 8 10z"/>
+          </svg>
           <div className="tax-info">
             <span className="tax-label">Składka Zdrowotna (9%)</span>
             <span className="tax-amount">{stats?.taxes?.health || 0} zł</span>
@@ -155,7 +170,7 @@ export default function TaxDashboard() {
       </div>
 
       <div className="tax-summary-alert">
-          Łącznie do zapłaty (VAT + PIT + ZUS): 
+          <span>Łącznie do zapłaty (VAT + PIT + ZUS):</span>
           <strong> {Math.round(((stats?.taxes?.vat || 0) + (stats?.taxes?.pit || 0) + (stats?.taxes?.health || 0)) * 100) / 100} zł</strong>
       </div>
 
@@ -165,21 +180,21 @@ export default function TaxDashboard() {
           className="btn-secondary-outline"
           style={{ marginBottom: '15px' }}
         >
-          {showSplit ? "🙈 Schowaj podział zysku" : "💰 Pokaż planowanie wypłaty"}
+          {showSplit ? "Ukryj planowanie wypłaty" : "Pokaż planowanie wypłaty"}
         </button>
 
         {showSplit && (
           <div className="profit-split-card" style={{ 
             background: 'var(--bg-gray)', 
-            padding: '25px', 
-            borderRadius: '20px',
-            border: '2px solid var(--border-color)',
-            animation: 'fadeIn 0.3s ease'
+            padding: '20px', 
+            borderRadius: '6px',
+            border: '1px solid var(--border-color)',
+            animation: 'fadeIn 0.25s ease'
           }}>
-            <h4 style={{ marginBottom: '20px' }}>Planowanie Portfela (Po odliczeniu danin)</h4>
+            <h4 style={{ marginBottom: '16px', fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-main)' }}>Planowanie Portfela (Po odliczeniu danin)</h4>
             
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '0.85rem' }}>
                 Podział: {splitPercent}% Prywatnie / {100-splitPercent}% Na obrót
               </label>
               <input 
@@ -192,21 +207,21 @@ export default function TaxDashboard() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              <div style={{ background: 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Portfel Prywatny</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#16a34a' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Portfel Prywatny</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#16a34a', marginTop: '4px' }}>
                   {Math.round(netProfit * (splitPercent/100) * 100) / 100} zł
                 </div>
               </div>
-              <div style={{ background: 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Fundusz Firmowy</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--primary-color)' }}>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Fundusz Firmowy</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--primary-color)', marginTop: '4px' }}>
                   {Math.round(netProfit * ((100-splitPercent)/100) * 100) / 100} zł
                 </div>
               </div>
             </div>
-            <div style={{ marginTop: '15px', fontSize: '0.85rem', textAlign: 'center', opacity: 0.7 }}>
+            <div style={{ marginTop: '15px', fontSize: '0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               * Wyliczone z czystego zysku: <strong>{Math.round(netProfit * 100) / 100} zł</strong>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export default function EditOrderForm({ order, clients, onCancel, onSaved }) {
   const formatDate = (dateString) => {
@@ -50,94 +50,114 @@ export default function EditOrderForm({ order, clients, onCancel, onSaved }) {
     }
   };
 
+  const getClientOptionLabel = (c) => {
+    if (c.company_name) {
+      const person = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+      return person ? `🏢 ${c.company_name} (${person})` : `🏢 ${c.company_name}`;
+    }
+    const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+    return fullName ? `👤 ${fullName}` : (c.email || `Klient #${c.id}`);
+  };
+
   return (
     <div className="order-form-container">
-      <h3 style={{ marginTop: 0, textAlign: "center" }}>Edycja zlecenia #{order.id}</h3>
+      <h3 style={{ marginTop: 0, marginBottom: 18, textAlign: "center" }}>
+        Edycja zlecenia <span style={{ color: 'var(--primary-color)' }}>#{order.id}</span>
+      </h3>
 
       <form onSubmit={handleSubmit}>
-        <div className="form-row">
-          <div className="form-group" style={{ flex: 2 }}>
-            <label>Tytuł</label>
+        <div className="form-row" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: 14 }}>
+          <div className="form-group" style={{ flex: 2, minWidth: '200px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Tytuł zlecenia *</label>
             <input
               name="title"
               value={formData.title}
               onChange={handleChange}
               className="form-input"
               required
+              style={{ width: '100%', height: '42px' }}
             />
           </div>
-          <div className="form-group">
-            <label>Cena</label>
+          <div className="form-group" style={{ flex: 1, minWidth: '130px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Cena (PLN)</label>
             <input
               type="number"
+              step="0.01"
               name="price"
               value={formData.price}
               onChange={handleChange}
               className="form-input"
+              style={{ width: '100%', height: '42px' }}
             />
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Klient</label>
+        <div className="form-row" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: 14 }}>
+          <div className="form-group" style={{ flex: 1, minWidth: '180px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Klient *</label>
             <select
               name="client_id"
               value={formData.client_id}
               onChange={handleChange}
               className="form-select"
+              style={{ width: '100%', height: '42px', borderRadius: '8px' }}
             >
               {clients.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.first_name} {c.last_name}
+                  {getClientOptionLabel(c)}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="form-group">
-            <label>Status</label>
+          <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Status zlecenia</label>
             <select
               name="status"
               value={formData.status}
               onChange={handleChange}
               className="form-select"
+              style={{ width: '100%', height: '42px', borderRadius: '8px' }}
             >
-              <option value="nowe">Nowe</option>
-              <option value="w_trakcie">W realizacji</option>
-              <option value="zakonczone">Zakończone</option>
+              <option value="nowe">🔵 Nowe</option>
+              <option value="w_trakcie">🟠 W realizacji</option>
+              <option value="zakonczone">🟢 Zakończone</option>
+              <option value="wstrzymane">🔴 Wstrzymane</option>
             </select>
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Termin (Deadline)</label>
+        <div className="form-group" style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Termin realizacji (Deadline)</label>
           <input
             type="datetime-local"
             name="deadline"
             value={formData.deadline}
             onChange={handleChange}
             className="form-input"
+            style={{ width: '100%', height: '42px' }}
           />
         </div>
 
-        <div className="form-group">
-          <label>Opis</label>
+        <div className="form-group" style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Opis / Usterka</label>
           <textarea
             name="description"
             value={formData.description}
             onChange={handleChange}
             className="form-textarea"
+            style={{ width: '100%', minHeight: '90px', padding: '10px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
           />
         </div>
 
-        <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-          <button type="button" onClick={onCancel} className="btn btn-secondary">Anuluj</button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+        <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onCancel} className="btn btn-secondary" style={{ padding: '8px 20px', height: '42px' }}>
+            Anuluj
+          </button>
+          <button type="submit" className="btn btn-primary" style={{ padding: '8px 24px', height: '42px', fontWeight: 700 }} disabled={loading}>
             {loading ? "Zapisywanie..." : "Zapisz zmiany"}
           </button>
         </div>
-
       </form>
     </div>
   );

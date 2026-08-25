@@ -9,14 +9,23 @@ export default function EntriesList({ type }) {
   const [importing, setImporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
+  const [collapsedMonths, setCollapsedMonths] = useState({});
+  const [expandedRows, setExpandedRows] = useState({});
+
+  const toggleMonth = (mKey) => {
+    setCollapsedMonths(prev => ({
+      ...prev,
+      [mKey]: !prev[mKey]
+    }));
+  };
 
   const labels = type === "revenue" ? {
     btn: "+ Dodaj Fakturę Sprzedaży",
-    importBtn: "📥 Import Grupny XML",
+    importBtn: "Import Grupowy XML",
     title: "Przychody (Faktury)",
   } : {
     btn: "+ Dodaj Fakturę Kosztową",
-    importBtn: "📥 Import Hurtowy KSeF (XML)",
+    importBtn: "Import Hurtowy KSeF (XML)",
     title: "Koszty",
   };
 
@@ -182,13 +191,14 @@ export default function EntriesList({ type }) {
     return (
       <span style={{ 
         display: 'inline-block', 
-        width: '20px', 
+        width: '12px', 
         textAlign: 'center', 
-        opacity: isActive ? 1 : 0.2,
+        opacity: isActive ? 0.9 : 0.3,
         marginLeft: col === 'date' || col === 'number' || col === 'contractor' || col === 'category' ? 5 : 0,
         marginRight: col === 'net_amount' || col === 'vat_amount' || col === 'gross_amount' ? 5 : 0,
+        fontSize: '0.65rem'
       }}>
-        {isActive ? (sortConfig.direction === 'asc' ? '🔼' : '🔽') : '↕'}
+        {isActive ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}
       </span>
     );
   };
@@ -223,11 +233,11 @@ export default function EntriesList({ type }) {
             </div>
             <input 
                 type="text" 
-                placeholder="🔍 Szukaj..." 
+                placeholder="Szukaj..." 
                 className="form-input"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                style={{ width: '100%', borderRadius: '100px', padding: '10px 20px' }}
+                style={{ width: '100%', borderRadius: '6px', padding: '8px 12px' }}
             />
         </div>
       </div>
@@ -269,11 +279,10 @@ export default function EntriesList({ type }) {
         <table className="table-accounting-modern">
           <thead>
             <tr>
-              <th style={{ width: '50px', textAlign: 'center' }}>📁</th>
+              <th style={{ width: '40px', textAlign: 'center' }}></th>
               <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>Data <SortIcon col="date" /></th>
               <th onClick={() => requestSort('number')} style={{ cursor: 'pointer' }}>Nr Dokumentu <SortIcon col="number" /></th>
               <th onClick={() => requestSort('contractor')} style={{ cursor: 'pointer' }}>{type === "revenue" ? "Klient" : "Kontrahent"} <SortIcon col="contractor" /></th>
-              <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>Kategoria <SortIcon col="category" /></th>
               <th onClick={() => requestSort('net_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="net_amount" /> Netto</th>
               <th onClick={() => requestSort('vat_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="vat_amount" /> VAT</th>
               <th onClick={() => requestSort('gross_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="gross_amount" /> Brutto</th>
@@ -288,6 +297,7 @@ export default function EntriesList({ type }) {
               return sortedAndFilteredEntries.reduce((acc, e) => {
                 const d = new Date(e.date);
                 const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const isCollapsed = !!collapsedMonths[mKey];
                 
                 if (sortConfig.key === 'date' && mKey !== currentMonthKey) {
                   currentMonthKey = mKey;
@@ -301,12 +311,22 @@ export default function EntriesList({ type }) {
                   const monthReady = monthEntries.filter(x => x.is_ready).length;
 
                   acc.push(
-                    <tr key={`header-${mKey}`} className="month-summary-row">
-                       <td colSpan="5" className="month-summary-label">
-                         📅 {d.toLocaleString('pl-PL', { month: 'long', year: 'numeric' }).toUpperCase()} 
-                         <span className="month-summary-sub">
-                           (W teczce: {monthReady} / {monthEntries.length})
-                         </span>
+                    <tr 
+                      key={`header-${mKey}`} 
+                      className="month-summary-row"
+                      onClick={() => toggleMonth(mKey)}
+                      style={{ cursor: "pointer", userSelect: "none" }}
+                    >
+                       <td colSpan="4">
+                         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 600 }}>
+                           <span style={{ fontSize: "0.7rem", width: "12px", display: "inline-block", color: "var(--text-muted)" }}>
+                             {isCollapsed ? "▶" : "▼"}
+                           </span>
+                           <span>{d.toLocaleString('pl-PL', { month: 'long', year: 'numeric' }).toUpperCase()}</span>
+                           <span className="month-summary-sub">
+                             (W teczce: {monthReady} / {monthEntries.length})
+                           </span>
+                         </div>
                        </td>
                        <td data-label="Suma Netto" className="text-right month-sum">{sumNet.toFixed(2)} zł</td>
                        <td data-label="Suma VAT" className="text-right month-sum">{sumVat.toFixed(2)} zł</td>
@@ -316,42 +336,65 @@ export default function EntriesList({ type }) {
                   );
                 }
 
-                acc.push(
-                  <tr key={e.id} className={e.is_ready ? "row-ready" : ""}>
-                    <td data-label="Status" style={{ textAlign: 'center' }}>
-                       <button 
-                        className={`btn-ready-toggle ${e.is_ready ? 'active' : ''}`}
-                        onClick={() => handleToggleReady(e)}
-                        title={e.is_ready ? "Oznacz jako niegotowe" : "Oznacz jako gotowe do wysyłki"}
-                       >
-                         {e.is_ready ? "✅" : "⭕"}
-                       </button>
-                    </td>
-                    <td data-label="Data">{new Date(e.date).toLocaleDateString()}</td>
-                    <td data-label="Numer"><strong>{e.number}</strong></td>
-                    <td data-label="Kontrahent">{e.contractor}</td>
-                    <td data-label="Kategoria">
-                        <span className="badge-category">{e.category}</span>
-                        {e.is_car_cost && <span className="badge-car" title="Auto (75% / 50%)">🚗</span>}
-                    </td>
-                    <td data-label="Netto" className="text-right">{e.net_amount} zł</td>
-                    <td data-label="VAT" className="text-right">{e.vat_amount} zł ({e.vat_rate}%)</td>
-                    <td data-label="Brutto" className="text-right"><strong>{e.gross_amount} zł</strong></td>
-                    <td data-label="Akcje" className="text-right">
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                        <button className="btn-table" onClick={() => setEditingEntry(e)}>Edytuj</button>
-                        <button className="btn-table btn-delete" onClick={() => handleDelete(e.id)}>Usuń</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
+                if (sortConfig.key !== 'date' || !isCollapsed) {
+                  const isExpanded = !!expandedRows[e.id];
+                  acc.push(
+                    <tr 
+                      key={e.id} 
+                      className={`accounting-row-card ${e.is_ready ? "row-ready" : ""} ${isExpanded ? "row-expanded" : ""}`}
+                      onClick={(evt) => {
+                        // Prevent expand toggle when clicking interactive buttons
+                        if (evt.target.closest('button')) return;
+                        setExpandedRows(prev => ({ ...prev, [e.id]: !prev[e.id] }));
+                      }}
+                    >
+                      <td data-label="Status" className="cell-status">
+                         <button 
+                          className={`btn-ready-toggle ${e.is_ready ? 'active' : ''}`}
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            handleToggleReady(e);
+                          }}
+                          title={e.is_ready ? "Oznacz jako niegotowe" : "Oznacz jako gotowe do wysyłki"}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                         >
+                           {e.is_ready ? (
+                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#10b981" }}>
+                               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                               <polyline points="22 4 12 14.01 9 11.01"/>
+                             </svg>
+                           ) : (
+                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35 }}>
+                               <circle cx="12" cy="12" r="10"/>
+                             </svg>
+                           )}
+                         </button>
+                      </td>
+                      <td data-label="Data" className="cell-date">{new Date(e.date).toLocaleDateString()}</td>
+                      <td data-label="Numer" className="cell-number">
+                        <strong className="entry-number">{e.number}</strong>
+                        {e.is_car_cost && <span className="badge-car" style={{ marginLeft: '8px' }} title="Pojazd (75% / 50%)">Auto</span>}
+                      </td>
+                      <td data-label="Kontrahent" className="cell-contractor">{e.contractor}</td>
+                      <td data-label="Netto" className="text-right cell-netto">{e.net_amount} zł</td>
+                      <td data-label="VAT" className="text-right cell-vat">{e.vat_amount} zł ({e.vat_rate}%)</td>
+                      <td data-label="Brutto" className="text-right cell-brutto"><strong className="entry-gross">{e.gross_amount} zł</strong></td>
+                      <td data-label="Akcje" className="text-right cell-actions">
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button className="btn-table" onClick={(evt) => { evt.stopPropagation(); setEditingEntry(e); }}>Edytuj</button>
+                          <button className="btn-table btn-delete" onClick={(evt) => { evt.stopPropagation(); handleDelete(e.id); }}>Usuń</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
                 return acc;
               }, []);
             })()}
 
             {sortedAndFilteredEntries.length === 0 && (
               <tr>
-                <td colSpan="9" style={{textAlign: 'center', padding: '40px'}}>
+                <td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>
                   {searchTerm ? `Brak wyników dla: "${searchTerm}"` : "Brak zapisanych wpisów w tej kategorii."}
                 </td>
               </tr>

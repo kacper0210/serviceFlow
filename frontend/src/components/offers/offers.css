@@ -1,0 +1,549 @@
+/* Premium styling for Offers Module */
+
+.offers-container {
+  padding: 0;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.offers-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 12px;
+}
+
+.offers-table th {
+  background: var(--bg-gray);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 12px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.offers-table td {
+  padding: 14px 20px;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  transition: background-color 0.15s ease;
+}
+
+.offers-table tr:hover td {
+  background-color: var(--primary-light);
+}
+
+/* Status Badges with Micro-animations */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.status-badge:hover {
+  transform: scale(1.02);
+}
+
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.status-badge.status-robocza {
+  background: var(--bg-gray);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+.status-badge.status-robocza::before { background: var(--text-muted); }
+
+.status-badge.status-wyslana {
+  background: var(--primary-light);
+  color: var(--primary-color);
+  border-color: rgba(79, 70, 229, 0.15);
+}
+.status-badge.status-wyslana::before { background: var(--primary-color); }
+
+.status-badge.status-zaakceptowana {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--success);
+  border-color: rgba(16, 185, 129, 0.15);
+}
+.status-badge.status-zaakceptowana::before { background: var(--success); }
+
+.status-badge.status-odrzucona {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger-color);
+  border-color: rgba(239, 68, 68, 0.15);
+}
+.status-badge.status-odrzucona::before { background: var(--danger-color); }
+
+/* Offer Items Form Layout */
+.items-form-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
+.items-form-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.items-form-table td {
+  padding: 8px;
+  vertical-align: middle;
+}
+
+.item-row {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.item-row:hover {
+  background-color: rgba(0,0,0,0.01);
+}
+
+body.dark-mode .item-row:hover {
+  background-color: rgba(255,255,255,0.01);
+}
+
+.btn-remove-item {
+  color: var(--danger-color);
+  font-size: 1.1rem;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-item:hover {
+  background: rgba(239, 68, 68, 0.08);
+  transform: rotate(90deg);
+}
+
+.offer-totals-box {
+  background: var(--bg-gray);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+  max-width: 320px;
+  margin-left: auto;
+}
+
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-color);
+  font-size: 0.85rem;
+}
+
+.totals-row:last-child {
+  border-bottom: none;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--primary-color);
+}
+
+/* Beautiful KMTechFix Offer Document Preview */
+.page { 
+  max-width: 900px; 
+  margin: 0 auto; 
+  background: #ffffff !important; 
+  color: #1a1a1a !important;
+  padding: 38px 45px;
+  font-family: 'Inter', sans-serif;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+body.dark-mode .page {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #e8e8e8;
+}
+
+.page .header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: flex-start; 
+  margin-bottom: 24px; 
+  padding-bottom: 16px; 
+  border-bottom: 1px solid #e8e8e8; 
+}
+.page .brand-name { font-size: 21px; font-weight: 700; letter-spacing: -0.5px; color: #111827; }
+.page .brand-name span { color: #2563eb; }
+.page .brand-meta { margin-top: 5px; font-size: 11.5px; color: #6b7280; line-height: 1.5; }
+.page .date { font-size: 12.5px; color: #6b7280; }
+
+.page .doc-title { margin-bottom: 20px; }
+.page .doc-label { font-size: 10.5px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #2563eb; margin-bottom: 4px; }
+.page .doc-heading { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; color: #111827; }
+.page .doc-sub { font-size: 12.5px; color: #6b7280; margin-top: 4px; }
+
+.page .section { margin-bottom: 20px; }
+.page .section-title { font-size: 10.5px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: #9ca3af; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #f3f4f6; }
+
+/* Tabela kosztorysu */
+.page table.cost-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  table-layout: fixed; 
+  font-size: 11.5px; 
+}
+.page table.cost-table th { 
+  background: #f9fafb !important; 
+  color: #4b5563 !important; 
+  font-weight: 600; 
+  font-size: 10px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.4px; 
+  padding: 8px 4px; 
+  border-top: 1px solid #e5e7eb; 
+  border-bottom: 2px solid #e5e7eb; 
+  text-align: right; 
+  vertical-align: middle;
+}
+.page table.cost-table td { 
+  padding: 7px 4px; 
+  border-bottom: 1px solid #f3f4f6; 
+  color: #1f2937 !important; 
+  text-align: right; 
+  white-space: nowrap; 
+  vertical-align: middle;
+}
+
+/* Definicja szerokości kolumn */
+.page .col-name { width: 30%; text-align: left !important; white-space: normal !important; padding-left: 2px !important; }
+.page .col-price { width: 11%; }
+.page .col-vat { width: 9%; }
+.page .col-gross { width: 11%; }
+.page .col-qty { width: 8%; text-align: center !important; }
+.page .col-tot-net { width: 11%; }
+.page .col-tot-vat { width: 9%; }
+.page .col-tot-gross { width: 11%; }
+
+.page table.cost-table tr.total-row td { 
+  border-top: 2px solid #111827 !important; 
+  border-bottom: 2px solid #111827 !important; 
+  background: #f9fafb !important; 
+  font-weight: 700; 
+  color: #111827 !important; 
+  font-size: 12px; 
+  padding: 8px 4px;
+}
+
+/* Podsumowanie */
+.page .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 4px; }
+.page .sum-item { padding: 10px 14px; background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 6px; }
+.page .sum-label { font-size: 9.5px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 3px; }
+.page .sum-value { font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: #1a1a1a; white-space: nowrap; }
+.page .sum-item.pay { background: #eff6ff; border-color: #dbeafe; }
+.page .sum-item.pay .sum-label { color: #2563eb; }
+.page .sum-item.pay .sum-value { color: #2563eb; }
+
+/* Specyfikacja i warunki */
+.page .tech-box { font-size: 11px; color: #4b5563; line-height: 1.5; background: #fafafa; border: 1px solid #f3f4f6; border-radius: 6px; padding: 10px 14px; }
+.page .tech-box ul { margin-left: 16px; margin-top: 3px; }
+.page .tech-box li { margin-bottom: 2px; }
+.page .conditions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e5e7eb; font-size: 11px; }
+.page .condition-item strong { color: #1f2937; }
+
+/* Sekcja podpisów i pieczątki */
+.page .signatures-section {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  margin-top: 32px;
+  margin-bottom: 20px;
+}
+
+.page .signature-box {
+  width: 280px;
+  text-align: center;
+}
+
+.page .signature-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.page .signature-line {
+  border-top: 1px dashed #d1d5db;
+  padding-top: 6px;
+  font-size: 10.5px;
+  color: #9ca3af;
+  margin-top: 85px;
+}
+
+.page .stamp-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 110px;
+}
+
+.page .stamp-img {
+  width: 260px;
+  max-height: 110px;
+  object-fit: contain;
+  display: block;
+}
+
+.page .footer { 
+  margin-top: 24px; 
+  padding-top: 14px; 
+  border-top: 1px solid #e8e8e8; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  text-align: center;
+}
+.page .validity-note { font-size: 11.5px; color: #6b7280; font-weight: 500; }
+
+@page { size: A4; margin: 10mm 12mm; }
+@media print {
+  /* Hide non-printable navigation, sidebar, tables, and controls */
+  header, nav, aside, .navbar, .sidebar, .topbar, .header-actions-row, .table-container, .pagination-row, .no-print {
+    display: none !important;
+  }
+
+  /* Reset outer layout containers so children remain visible */
+  html, body, #root, .app-layout, .app-content, .offers-container {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
+  }
+
+  /* Position modal & document container for A4 printing */
+  .modal-overlay {
+    position: static !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    z-index: auto !important;
+  }
+
+  .modal-content {
+    position: static !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .page {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+
+  .page * {
+    visibility: visible !important;
+  }
+}
+
+/* Mobile Responsive Styling for Offers Module */
+@media (max-width: 768px) {
+  .offers-container {
+    padding: 0;
+  }
+
+  .offers-container .header-actions-row,
+  .offers-container .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+  }
+
+  .offers-container .search-box {
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .offers-container .search-box input,
+  .offers-container .search-box select {
+    width: 100% !important;
+  }
+
+  .offers-container .actions-box {
+    width: 100%;
+  }
+
+  .offers-container .actions-box button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .offers-container .table-container {
+    background: none;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .offers-table, 
+  .offers-table thead, 
+  .offers-table tbody, 
+  .offers-table th, 
+  .offers-table td, 
+  .offers-table tr { 
+    display: block; 
+  }
+
+  .offers-table thead tr { 
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .offers-table tr {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    padding: 0;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .offers-table td { 
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 16px !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+    font-size: 0.88rem;
+  }
+
+  .offers-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 12px;
+  }
+
+  /* Card Header (Title) */
+  .offers-table td[data-label="Tytuł"] {
+    background: var(--bg-gray);
+    padding: 14px 16px !important;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border-color);
+    justify-content: space-between;
+  }
+
+  .offers-table td[data-label="Tytuł"]::before {
+    content: "Oferta";
+  }
+
+  /* Actions Row inside card */
+  .offers-table td[data-label="Akcje"] {
+    border-bottom: none;
+    background: rgba(0, 0, 0, 0.015);
+    padding: 12px 16px !important;
+    justify-content: flex-end;
+  }
+
+  .offers-table td[data-label="Akcje"]::before {
+    display: none;
+  }
+
+  .offers-table td[data-label="Akcje"] > div {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Cost Table inside Modal on Mobile */
+  .page {
+    padding: 20px 16px !important;
+  }
+
+  .page .summary {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .page .conditions-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .page table.cost-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

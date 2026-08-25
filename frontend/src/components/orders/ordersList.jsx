@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import AddOrderForm from "./addOrderForm";
 import EditOrderForm from "./editOrderForm";
@@ -11,6 +11,7 @@ export default function OrdersList() {
   const [loading, setLoading] = useState(true);
 
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [searchText, setSearchText] = useState("");
@@ -23,6 +24,34 @@ export default function OrdersList() {
       setFilterStatus(statusParam);
     }
   }, [location.search]);
+
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set();
+    orders.forEach(order => {
+      const dateStr = order.deadline || order.created_at;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          monthsSet.add(key);
+        }
+      }
+    });
+
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    monthsSet.add(currentKey);
+
+    return Array.from(monthsSet).sort().reverse().map(key => {
+      const [year, month] = key.split('-');
+      const monthNames = [
+        "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+        "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+      ];
+      const label = `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+      return { key, label };
+    });
+  }, [orders]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editOrder, setEditOrder] = useState(null);
@@ -71,21 +100,152 @@ export default function OrdersList() {
     }
   };
 
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickLoading, setQuickLoading] = useState(false);
+
+  const handleQuickAddOrder = async (e) => {
+    e.preventDefault();
+    if (!quickTitle.trim()) return;
+
+    setQuickLoading(true);
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const token = authData?.token;
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: quickTitle.trim(),
+          status: "nowe"
+        })
+      });
+
+      if (res.ok) {
+        const newOrder = await res.json();
+        setOrders(prev => [newOrder, ...prev]);
+        setQuickTitle("");
+      }
+    } catch (err) {
+      console.error("Błąd szybkiego dodawania zlecenia:", err);
+    } finally {
+      setQuickLoading(false);
+    }
+  };
+
+  const getClientDisplayName = (order) => {
+    if (order.company_name) return order.company_name;
+    if (order.first_name || order.last_name) return `${order.first_name || ''} ${order.last_name || ''}`.trim();
+    if (order.client_id) {
+      const c = clients.find(item => item.id === order.client_id);
+      if (c) {
+        if (c.company_name) return c.company_name;
+        const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+        if (fullName) return fullName;
+      }
+    }
+    return "👤 Brak klienta";
+  };
+
+  const getStatusBadge = (status) => {
+    if (!status) return { label: "-", className: "" };
+    const st = status.toLowerCase();
+    if (st === "completed" || st === "zakonczone" || st === "zakończone") {
+      return { label: "Zakończone", className: "status-zakonczone" };
+    }
+    if (st === "in_progress" || st === "w_trakcie" || st === "w realizacji") {
+      return { label: "W realizacji", className: "status-w_trakcie" };
+    }
+    if (st === "new" || st === "nowe") {
+      return { label: "Nowe", className: "status-nowe" };
+    }
+    if (st === "on_hold" || st === "wstrzymane") {
+      return { label: "Wstrzymane", className: "status-wstrzymane" };
+    }
+    return { label: status, className: `status-${st}` };
+  };
+
+  const [sortField, setSortField] = useState("id");
+  const [sortDirection, setSortDirection] = useState("desc");
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const renderSortIcon = (field) => {
+    if (sortField !== field) return <span style={{ opacity: 0.25, marginLeft: 4, fontSize: '0.75rem' }}>↕</span>;
+    return <span style={{ color: "var(--primary-color)", marginLeft: 4, fontWeight: "bold", fontSize: '0.8rem' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>;
+  };
+
   const filteredOrders = orders.filter(order => {
     if (filterStatus) {
       const st = (order.status || "").toLowerCase();
-      if (filterStatus === "zakonczone" && !st.includes("zako")) return false;
-      if (filterStatus !== "zakonczone" && st !== filterStatus) return false;
+      if (filterStatus === "zakonczone" && !(st === "completed" || st.includes("zako"))) return false;
+      if (filterStatus === "w_trakcie" && !(st === "in_progress" || st.includes("trakcie"))) return false;
+      if (filterStatus === "nowe" && !(st === "new" || st.includes("now"))) return false;
+      if (filterStatus === "wstrzymane" && !(st === "on_hold" || st.includes("wstrzyma"))) return false;
+    }
+
+    if (filterMonth) {
+      const dateStr = order.deadline || order.created_at;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
+      const orderMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (orderMonthKey !== filterMonth) return false;
     }
 
     const search = searchText.toLowerCase();
     const titleMatch = order.title?.toLowerCase().includes(search);
-
-    const client = clients.find(c => c.id === order.client_id);
-    const clientName = client ? `${client.first_name} ${client.last_name}`.toLowerCase() : "";
+    const clientName = getClientDisplayName(order).toLowerCase();
     const clientMatch = clientName.includes(search);
 
     return !searchText || titleMatch || clientMatch;
+  });
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    let aVal, bVal;
+
+    switch (sortField) {
+      case 'id':
+        aVal = Number(a.id);
+        bVal = Number(b.id);
+        break;
+      case 'title':
+        aVal = (a.title || "").toLowerCase();
+        bVal = (b.title || "").toLowerCase();
+        break;
+      case 'client':
+        aVal = getClientDisplayName(a).toLowerCase();
+        bVal = getClientDisplayName(b).toLowerCase();
+        break;
+      case 'deadline':
+        aVal = a.deadline ? new Date(a.deadline).getTime() : 0;
+        bVal = b.deadline ? new Date(b.deadline).getTime() : 0;
+        break;
+      case 'price':
+        aVal = Number(a.price) || 0;
+        bVal = Number(b.price) || 0;
+        break;
+      case 'status':
+        aVal = (getStatusBadge(a.status).label || "").toLowerCase();
+        bVal = (getStatusBadge(b.status).label || "").toLowerCase();
+        break;
+      default:
+        aVal = Number(a.id);
+        bVal = Number(b.id);
+    }
+
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   return (
@@ -109,23 +269,92 @@ export default function OrdersList() {
 
       {activeTab === 'list' && (
         <>
+          {/* Express 1-Click Quick Add Order Bar */}
+          <form onSubmit={handleQuickAddOrder} style={{
+            display: 'flex',
+            gap: '10px',
+            marginBottom: '16px',
+            background: 'var(--bg-card)',
+            padding: '10px 16px',
+            borderRadius: '12px',
+            border: '1.5px dashed var(--primary-color)',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.88rem', color: 'var(--primary-color)' }}>
+              ⚡ Szybkie zlecenie:
+            </div>
+            <input
+              className="form-input"
+              placeholder="Wpisz tylko tytuł zlecenia i kliknij Enter (np. Naprawa telefonu, Diagnoza)..."
+              value={quickTitle}
+              onChange={e => setQuickTitle(e.target.value)}
+              style={{ flex: 1, minWidth: '200px', height: '40px', fontSize: '0.88rem', borderRadius: '8px' }}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={quickLoading || !quickTitle.trim()}
+              style={{ height: '40px', padding: '0 20px', fontWeight: 600, whiteSpace: 'nowrap', borderRadius: '8px' }}
+            >
+              {quickLoading ? "Dodawanie..." : "+ Dodaj błyskawicznie"}
+            </button>
+          </form>
+
           <div className="toolbar">
         <div className="search-box">
           <input
-            className="filter-input"
+            className="filter-input filter-input-search"
             placeholder="Szukaj (tytuł, klient)..."
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
           />
           <select
-            className="filter-input"
+            className="filter-input filter-input-month"
+            value={filterMonth}
+            onChange={e => {
+              setFilterMonth(e.target.value);
+              setCurrentPage(1);
+            }}
+          >
+            <option value="">Wszystkie miesiące</option>
+            {availableMonths.map(m => (
+              <option key={m.key} value={m.key}>
+                📅 {m.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="filter-input filter-input-status"
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={e => {
+              setFilterStatus(e.target.value);
+              setCurrentPage(1);
+            }}
           >
             <option value="">Wszystkie statusy</option>
             <option value="nowe">Nowe</option>
             <option value="w_trakcie">W realizacji</option>
             <option value="zakonczone">Zakończone</option>
+            <option value="wstrzymane">Wstrzymane</option>
+          </select>
+          <select
+            className="filter-input filter-input-sort"
+            value={`${sortField}_${sortDirection}`}
+            onChange={e => {
+              const [field, dir] = e.target.value.split('_');
+              setSortField(field);
+              setSortDirection(dir);
+            }}
+          >
+            <option value="id_desc">Sortuj: Najnowsze (ID ↓)</option>
+            <option value="id_asc">Sortuj: Najstarsze (ID ↑)</option>
+            <option value="deadline_asc">Sortuj: Termin (najbliższy)</option>
+            <option value="deadline_desc">Sortuj: Termin (najdalszy)</option>
+            <option value="price_desc">Sortuj: Cena (najwyższa)</option>
+            <option value="price_asc">Sortuj: Cena (najniższa)</option>
+            <option value="title_asc">Sortuj: Tytuł (A-Z)</option>
+            <option value="client_asc">Sortuj: Klient (A-Z)</option>
           </select>
         </div>
 
@@ -145,36 +374,51 @@ export default function OrdersList() {
             <table className="orders-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Tytuł</th>
-                  <th>Klient</th>
-                  <th>Termin</th>
-                  <th>Cena</th>
-                  <th>Status</th>
-                  <th>Akcje</th>
+                  <th style={{ width: "6%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("id")}>
+                    ID {renderSortIcon("id")}
+                  </th>
+                  <th style={{ width: "25%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("title")}>
+                    Tytuł {renderSortIcon("title")}
+                  </th>
+                  <th style={{ width: "23%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("client")}>
+                    Klient {renderSortIcon("client")}
+                  </th>
+                  <th style={{ width: "13%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("deadline")}>
+                    Termin {renderSortIcon("deadline")}
+                  </th>
+                  <th style={{ width: "13%", textAlign: "right", paddingRight: "20px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("price")}>
+                    Cena {renderSortIcon("price")}
+                  </th>
+                  <th style={{ width: "12%", textAlign: "center", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("status")}>
+                    Status {renderSortIcon("status")}
+                  </th>
+                  <th style={{ width: "8%", textAlign: "right", paddingRight: "20px" }}>Akcje</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => {
-                  const client = clients.find(c => c.id === order.client_id);
+                {sortedOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => {
+                  const clientName = getClientDisplayName(order);
+                  const statusInfo = getStatusBadge(order.status);
                   return (
                     <tr key={order.id}>
                       <td data-label="ID">#{order.id}</td>
                       <td data-label="Tytuł"><strong>{order.title}</strong></td>
                       <td data-label="Klient">
-                        {client ? `${client.first_name} ${client.last_name}` : "Nieznany"}
+                        <strong>{clientName}</strong>
                       </td>
-                      <td data-label="Termin">
+                      <td data-label="Termin" style={{ whiteSpace: "nowrap" }}>
                         {order.deadline ? new Date(order.deadline).toLocaleDateString() : "-"}
                       </td>
-                      <td data-label="Cena">{order.price ? `${order.price} zł` : "-"}</td>
-                      <td data-label="Status">
-                        <span className={`status-badge status-${order.status}`}>
-                          {order.status.replace("_", " ")}
+                      <td data-label="Cena" className="text-right" style={{ whiteSpace: "nowrap", fontWeight: 600, textAlign: "right", paddingRight: "20px" }}>
+                        {order.price ? `${Number(order.price).toFixed(2)} zł` : "-"}
+                      </td>
+                      <td data-label="Status" style={{ textAlign: "center" }}>
+                        <span className={`status-badge ${statusInfo.className}`}>
+                          {statusInfo.label}
                         </span>
                       </td>
-                      <td data-label="Akcje">
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                      <td data-label="Akcje" style={{ textAlign: "right", paddingRight: "20px" }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                           <button className="btn-table" onClick={() => setDetailsId(order.id)}>Podgląd</button>
                           <button className="btn-table" onClick={() => setEditOrder(order)}>Edytuj</button>
                           <button className="btn-table btn-delete" onClick={() => handleDelete(order.id)}>Usuń</button>

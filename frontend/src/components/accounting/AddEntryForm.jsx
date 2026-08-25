@@ -130,35 +130,18 @@ export default function AddEntryForm({ type, onSaved, onCancel, initialData }) {
             <div>Brutto: <strong>{form.gross_amount} zł</strong></div>
         </div>
 
-        <div className="form-row">
-            <div className="form-group">
-                <label>Kategoria</label>
-                <select 
-                    className="form-select"
-                    value={form.category}
-                    onChange={e => setForm({...form, category: e.target.value})}
-                >
-                    <option value="Inne">Inne</option>
-                    <option value="Paliwo / Auto">Paliwo / Auto</option>
-                    <option value="Media / Internet">Media / Internet</option>
-                    <option value="Narzędzia">Narzędzia</option>
-                    <option value="Marketing">Marketing</option>
-                </select>
-            </div>
-            <div className="form-group flex-center-v" style={{paddingTop: '25px'}}>
-                {type === "expense" && (
-                  <label className="checkbox-label-modern">
-                    <input 
-                        type="checkbox" 
-                        checked={form.is_car_cost}
-                        onChange={e => setForm({...form, is_car_cost: e.target.checked})}
-                    />
-                    <span>Koszt pojazdu (Mieszany)</span>
-                  </label>
-                )}
-            </div>
-
-        </div>
+        {type === "expense" && (
+          <div className="form-group flex-center-v" style={{ marginTop: '15px', marginBottom: '15px' }}>
+            <label className="checkbox-label-modern">
+              <input 
+                  type="checkbox" 
+                  checked={form.is_car_cost}
+                  onChange={e => setForm({...form, is_car_cost: e.target.checked})}
+              />
+              <span>Koszt eksploatacji pojazdu (Auto)</span>
+            </label>
+          </div>
+        )}
 
         <div className="form-actions" style={{marginTop: '20px', justifyContent: 'flex-end', display: 'flex', gap: '10px'}}>
           <button type="button" className="btn btn-secondary" onClick={onCancel}>Anuluj</button>

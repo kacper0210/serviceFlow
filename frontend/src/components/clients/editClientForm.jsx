@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { formatPhoneInput } from "./utils";
 
 export default function EditClientForm({ client, onCancel, onSaved }) {
   const [formData, setFormData] = useState({
     id: client.id,
     first_name: client.first_name || "",
     last_name: client.last_name || "",
-    phone: client.phone || "",
+    phone: client.phone ? formatPhoneInput(client.phone) : "",
     email: client.email || "",
     nip: client.nip || "",
     address: client.address || "",
@@ -18,6 +19,10 @@ export default function EditClientForm({ client, onCancel, onSaved }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === "phone") {
+      setFormData(prev => ({ ...prev, phone: formatPhoneInput(value) }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 

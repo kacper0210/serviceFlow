@@ -5,23 +5,23 @@
 
 .toolbar {
   background: var(--bg-card);
-  padding: 24px;
-  border-radius: 16px;
+  padding: 16px 20px;
+  border-radius: 8px;
   box-shadow: var(--card-shadow);
-  margin-bottom: 32px;
+  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 16px;
   border: 1px solid var(--border-color);
 }
 
 .search-box {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
-  min-width: 350px;
+  min-width: 300px;
 }
 
 .search-box input,
@@ -29,10 +29,10 @@
   background-color: var(--input-bg);
   color: var(--input-text);
   border: 1px solid var(--border-color);
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  transition: all 0.2s;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
   width: 100%;
 }
 
@@ -40,17 +40,17 @@
 .search-box select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px var(--primary-light);
+  box-shadow: 0 0 0 2px var(--primary-light);
 }
 
 .table-container {
   background: var(--bg-card);
-  border-radius: 16px;
+  border-radius: 8px;
   box-shadow: var(--card-shadow);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-color);
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .clients-table {
@@ -60,21 +60,21 @@
 
 .clients-table th {
   background-color: var(--bg-gray);
-  padding: 20px;
+  padding: 14px 20px;
   text-align: left;
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-color);
 }
 
 .clients-table td {
-  padding: 24px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .clients-table tr:last-child td {
@@ -82,21 +82,21 @@
 }
 
 .clients-table tr:hover {
-  background-color: rgba(59, 130, 246, 0.03);
+  background-color: rgba(79, 70, 229, 0.02);
 }
 
 body.dark-mode .clients-table tr:hover {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 /* Badges */
 .badge-company {
   background: var(--primary-light);
   color: var(--primary-color);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-weight: 800;
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
   font-size: 0.7rem;
 }
 
@@ -104,59 +104,25 @@ body.dark-mode .clients-table tr:hover {
   background: var(--bg-gray);
   color: var(--text-muted);
   border: 1px solid var(--border-color);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
   font-size: 0.7rem;
-}
-
-/* Forms */
-.form-group {
-  margin-bottom: 24px;
-}
-
-.form-group label {
-  display: block;
-  font-weight: 800;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 10px;
-}
-
-.form-input,
-.form-select {
-  width: 100%;
-  padding: 14px 18px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--input-bg);
-  color: var(--input-text);
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.form-input:focus,
-.form-select:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px var(--primary-light);
 }
 
 .company-details-box {
   background: var(--bg-gray);
-  padding: 24px;
-  border-radius: 16px;
+  padding: 20px;
+  border-radius: 8px;
   border: 1px solid var(--border-color);
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 /* Detail View */
 .detail-card {
   background: var(--bg-card);
-  padding: 40px;
-  border-radius: 20px;
+  padding: 32px;
+  border-radius: 8px;
   box-shadow: var(--card-shadow);
   border: 1px solid var(--border-color);
 }
@@ -164,7 +130,7 @@ body.dark-mode .clients-table tr:hover {
 .detail-row {
   display: flex;
   justify-content: space-between;
-  padding: 20px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -173,12 +139,12 @@ body.dark-mode .clients-table tr:hover {
 }
 
 .detail-label {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
 .detail-value {
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-main);
 }
 
@@ -187,59 +153,23 @@ body.dark-mode .clients-table tr:hover {
   justify-content: space-between;
   align-items: center;
   background: var(--bg-gray);
-  padding: 20px 24px;
-  margin-bottom: 16px;
-  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
 }
 
 .order-item:hover {
-  transform: translateX(8px);
+  transform: translateX(4px);
   border-color: var(--primary-color);
-  background: white;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  background: var(--bg-card);
+  box-shadow: var(--card-shadow);
 }
 
-/* Action Buttons */
+/* Action Buttons (inherits default styles but allows specific spacing) */
 .link-btn {
-  background: white;
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  text-decoration: none;
-  margin-right: 8px;
-  display: inline-flex;
-  align-items: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-body.dark-mode .link-btn {
-  background: var(--bg-gray);
-}
-
-.link-btn:hover {
-  background: var(--bg-gray);
-  border-color: var(--text-muted);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.link-btn.delete-btn {
-  color: var(--danger-color);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.link-btn.delete-btn:hover {
-  background: var(--danger-color);
-  color: white;
-  border-color: var(--danger-color);
-  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.4);
+  margin-right: 6px;
 }
 
 @media (max-width: 768px) {
@@ -295,8 +225,8 @@ body.dark-mode .link-btn {
   .clients-table tr {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 20px;
-    margin-bottom: 20px;
+    border-radius: 8px;
+    margin-bottom: 16px;
     padding: 0;
     box-shadow: var(--card-shadow);
     display: flex;
@@ -313,15 +243,17 @@ body.dark-mode .link-btn {
     align-items: center;
     text-align: right;
     min-height: auto;
+    font-size: 0.85rem;
   }
 
-  /* Specyficzne style dla nagłówka karty (Klient) */
+  /* Specific styles for headers inside card */
   .clients-table td:nth-child(2) {
-    font-size: 1.1rem;
-    padding: 16px !important;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 14px 16px !important;
     justify-content: flex-start;
     text-align: left;
-    border-bottom: 2px solid var(--bg-gray);
+    border-bottom: 1px solid var(--border-color);
     background: var(--bg-gray);
   }
 
@@ -331,24 +263,23 @@ body.dark-mode .link-btn {
 
   .clients-table td:last-child {
     border-bottom: none;
-    background: rgba(0, 0, 0, 0.02);
-    padding: 15px 16px !important;
+    background: rgba(0, 0, 0, 0.01);
+    padding: 12px 16px !important;
   }
 
   body.dark-mode .clients-table td:last-child {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.01);
   }
 
   .clients-table td::before { 
     content: attr(data-label);
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     font-size: 0.65rem;
     color: var(--text-muted);
     text-align: left;
   }
 
-  /* Ukrywamy label dla Klienta, bo jest oczywisty */
   .clients-table td:nth-child(2)::before {
     display: none;
   }

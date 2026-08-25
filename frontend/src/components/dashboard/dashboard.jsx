@@ -6,6 +6,7 @@ import "./dashboard.css";
 
 export default function Dashboard() {
   const [orders, setOrders] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [clientsCount, setClientsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,10 +20,11 @@ export default function Dashboard() {
       const token = authData?.token;
       const headers = { "Authorization": `Bearer ${token}` };
 
-      const [ordersRes, clientsRes, settingsRes] = await Promise.all([
+      const [ordersRes, clientsRes, settingsRes, offersRes] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, { headers }),
         fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients`, { headers }),
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/accounting/settings/all`, { headers })
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/accounting/settings/all`, { headers }),
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/offers`, { headers })
       ]);
 
       if (!ordersRes.ok || !clientsRes.ok) throw new Error("Błąd pobierania danych");
@@ -34,8 +36,14 @@ export default function Dashboard() {
         settingsData = await settingsRes.json();
       }
 
+      let offersData = [];
+      if (offersRes.ok) {
+        offersData = await offersRes.json();
+      }
+
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setClientsCount(Array.isArray(clientsData) ? clientsData.length : 0);
+      setOffers(Array.isArray(offersData) ? offersData : []);
       
       const profitsMap = {};
       settingsData.forEach(s => {
@@ -57,15 +65,42 @@ export default function Dashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    const counts = { nowe: 0, w_trakcie: 0, zakonczone: 0 };
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const counts = { nowe: 0, w_trakcie: 0, zakonczone: 0, completedThisMonth: 0 };
     orders.forEach(o => {
       const st = (o.status || "").toLowerCase();
       if (st === "nowe") counts.nowe++;
       else if (st === "w_trakcie") counts.w_trakcie++;
-      else if (st.includes("zako")) counts.zakonczone++;
+      else if (st.includes("zako")) {
+        counts.zakonczone++;
+        const oDate = o.deadline ? new Date(o.deadline) : (o.created_at ? new Date(o.created_at) : null);
+        if (oDate && oDate.getMonth() === currentMonth && oDate.getFullYear() === currentYear) {
+          counts.completedThisMonth++;
+        }
+      }
     });
     return counts;
   }, [orders]);
+
+  const offersStats = useMemo(() => {
+    const counts = { robocza: 0, wyslana: 0, zaakceptowana: 0, odrzucona: 0 };
+    offers.forEach(of => {
+      const st = (of.status || "robocza").toLowerCase();
+      if (counts[st] !== undefined) {
+        counts[st]++;
+      }
+    });
+    return counts;
+  }, [offers]);
+
+  const monthNamesLocative = [
+    "styczniu", "lutym", "marcu", "kwietniu", "maju", "czerwcu",
+    "lipcu", "sierpniu", "wrześniu", "październiku", "listopadzie", "grudniu"
+  ];
+  const currentMonthName = monthNamesLocative[new Date().getMonth()];
 
   const monthlyData = useMemo(() => {
     const now = new Date();
@@ -122,6 +157,12 @@ export default function Dashboard() {
       ) : (
         <>
           <section className="dashboard-metrics-grid">
+            <Link to="/orders?status=zakonczone" className="dashboard-tile status-tile-completed-month">
+              <p className="tile-header">Wykonane w tym miesiącu</p>
+              <div className="tile-count">{stats.completedThisMonth}</div>
+              <div className="tile-sub">Zlecenia zakończone w {currentMonthName}</div>
+            </Link>
+
             <Link to="/orders?status=nowe" className="dashboard-tile status-tile-new">
               <p className="tile-header">Nowe Zlecenia</p>
               <div className="tile-count">{stats.nowe}</div>
@@ -132,12 +173,6 @@ export default function Dashboard() {
               <p className="tile-header">W Realizacji</p>
               <div className="tile-count">{stats.w_trakcie}</div>
               <div className="tile-sub">Zlecenia w trakcie</div>
-            </Link>
-
-            <Link to="/orders?status=zakonczone" className="dashboard-tile status-tile-done">
-              <p className="tile-header">Zakończone</p>
-              <div className="tile-count">{stats.zakonczone}</div>
-              <div className="tile-sub">Zysk osiągnięty</div>
             </Link>
 
             <Link to="/clients" className="dashboard-tile status-tile-clients">
@@ -154,28 +189,45 @@ export default function Dashboard() {
               <LineChart data={monthlyData.months} max={monthlyData.maxVal} />
             </section>
 
-
             <section className="dashboard-card">
               <h2 className="section-header">
-                🚀 Ostatnio dodane
+                <span>📊</span> Statystyki Ofert
               </h2>
-              {recentActivity.length > 0 ? (
-                <ul className="activity-list">
-                  {recentActivity.map(order => (
-                    <li key={order.id} className="activity-item">
-                      <div className="activity-info">
-                        <span className="activity-title">#{order.id} {order.title}</span>
-                        <span className="activity-status">{order.status}</span>
-                      </div>
-                      <span className="activity-date">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Brak zleceń.</p>
-              )}
+
+              <div className="offers-summary-widget" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ background: 'var(--bg-gray)', padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Do Akceptacji (Wysłane)</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f59e0b', marginTop: '4px' }}>{offersStats.wyslana}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-gray)', padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Zaakceptowane</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>{offersStats.zaakceptowana}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  <div style={{ background: 'var(--bg-gray)', padding: '10px 12px', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Robocze</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)' }}>{offersStats.robocza}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-gray)', padding: '10px 12px', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Odrzucone</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#ef4444' }}>{offersStats.odrzucona}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-gray)', padding: '10px 12px', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Wszystkie Oferty</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)' }}>{offers.length}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>Skuteczność akceptacji:</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                    {offers.length > 0 ? `${Math.round((offersStats.zaakceptowana / offers.length) * 100)}%` : '0%'}
+                  </span>
+                </div>
+              </div>
             </section>
           </div>
         </>

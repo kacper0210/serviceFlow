@@ -108,18 +108,19 @@ export default function OrdersCalendar() {
             }
 
             return (
-              <div key={cell.dateStr} className={`cal-day-cell ${cell.isToday ? 'today' : ''}`}>
+              <div key={cell.dateStr} className={`cal-day-cell ${cell.isToday ? 'today' : ''} ${cell.orders.length > 0 ? 'has-events' : ''}`}>
                 <span className="day-number">{cell.day}</span>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
                   {cell.orders.map(o => (
                     <div
                       key={o.id}
                       className={`cal-event event-${o.status}`}
                       onClick={() => setSelectedOrderId(o.id)}
-                      title={o.title}
+                      title={`${o.title} - ${Number(o.price).toFixed(2)} zł`}
                     >
-                      {o.title}
+                      <span className="event-title">{o.title}</span>
+                      {o.price && <span className="event-price">{Number(o.price).toFixed(0)}zł</span>}
                     </div>
                   ))}
                 </div>

@@ -1,9 +1,11 @@
 const pool = require("./db");
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+const ksefService = require("./ksefService");
 
 const app = express();
 app.use(cors());
@@ -197,7 +199,7 @@ app.get("/api/orders", checkAuth, asyncHandler(async (req, res) => {
   if (search) {
     params.push(`%${search}%`);
     const idx = params.length;
-    conditions.push(`(o.title ILIKE $${idx} OR c.first_name ILIKE $${idx} OR c.last_name ILIKE $${idx})`);
+    conditions.push(`(o.title ILIKE $${idx} OR c.company_name ILIKE $${idx} OR c.first_name ILIKE $${idx} OR c.last_name ILIKE $${idx})`);
   }
 
   const sortOptions = {
@@ -210,12 +212,15 @@ app.get("/api/orders", checkAuth, asyncHandler(async (req, res) => {
   const query = `
     SELECT 
       o.*, 
+      c.type as client_type,
+      c.company_name,
       c.first_name, 
       c.last_name, 
       c.email,
+      c.phone,
       COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
     FROM orders o 
-    JOIN clients c ON o.client_id = c.id 
+    LEFT JOIN clients c ON o.client_id = c.id 
     WHERE ${conditions.join(" AND ")} 
     ORDER BY ${orderBy}
   `;
@@ -262,6 +267,45 @@ app.post("/api/orders/:id/costs", checkAuth, asyncHandler(async (req, res) => {
   res.json(rows[0]);
 }));
 
+app.put("/api/orders/:orderId/costs/:costId", checkAuth, asyncHandler(async (req, res) => {
+  const { amount, title } = req.body;
+  const { orderId, costId } = req.params;
+
+  if (!amount) return res.status(400).json({ error: "Kwota jest wymagana" });
+
+  await pool.query(
+    "UPDATE order_costs SET amount = $1, title = $2 WHERE id = $3 AND order_id = $4",
+    [amount, title, costId, orderId]
+  );
+
+  const { rows } = await pool.query(`
+    SELECT o.*, 
+    COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
+    FROM orders o 
+    WHERE o.id = $1
+  `, [orderId]);
+
+  res.json(rows[0]);
+}));
+
+app.delete("/api/orders/:orderId/costs/:costId", checkAuth, asyncHandler(async (req, res) => {
+  const { orderId, costId } = req.params;
+
+  await pool.query(
+    "DELETE FROM order_costs WHERE id = $1 AND order_id = $2",
+    [costId, orderId]
+  );
+
+  const { rows } = await pool.query(`
+    SELECT o.*, 
+    COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
+    FROM orders o 
+    WHERE o.id = $1
+  `, [orderId]);
+
+  res.json(rows[0]);
+}));
+
 
 app.post("/api/orders", checkAuth, asyncHandler(async (req, res) => {
   const fields = ["title", "description", "status", "price", "notes", "client_id", "deadline"];
@@ -298,6 +342,175 @@ app.delete("/api/orders/:id", checkAuth, asyncHandler(async (req, res) => {
   res.json({ message: "Usunięto" });
 }));
 
+// --- OFFERS MODULE ---
+
+app.get("/api/offers", checkAuth, asyncHandler(async (req, res) => {
+  const { status, search } = req.query;
+  let conditions = ["1=1"];
+  let params = [];
+
+  if (status) {
+    params.push(status);
+    conditions.push(`o.status = $${params.length}`);
+  }
+
+  if (search) {
+    params.push(`%${search}%`);
+    const idx = params.length;
+    conditions.push(`(o.title ILIKE $${idx} OR c.first_name ILIKE $${idx} OR c.last_name ILIKE $${idx} OR c.company_name ILIKE $${idx})`);
+  }
+
+  const query = `
+    SELECT o.*, c.first_name, c.last_name, c.company_name, c.email as client_email
+    FROM offers o
+    LEFT JOIN clients c ON o.client_id = c.id
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY o.created_at DESC, o.id DESC
+  `;
+
+  const { rows } = await pool.query(query, params);
+  res.json(rows);
+}));
+
+app.get("/api/offers/:id", checkAuth, asyncHandler(async (req, res) => {
+  const offerQuery = `
+    SELECT o.*, c.first_name, c.last_name, c.company_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.nip as client_nip
+    FROM offers o
+    LEFT JOIN clients c ON o.client_id = c.id
+    WHERE o.id = $1
+  `;
+  const offerRes = await pool.query(offerQuery, [req.params.id]);
+  if (offerRes.rows.length === 0) return res.status(404).json({ error: "Nie znaleziono oferty" });
+  
+  const offer = offerRes.rows[0];
+  
+  const itemsRes = await pool.query(`SELECT * FROM offer_items WHERE offer_id = $1 ORDER BY id ASC`, [req.params.id]);
+  offer.items = itemsRes.rows;
+  
+  res.json(offer);
+}));
+
+app.post("/api/offers", checkAuth, asyncHandler(async (req, res) => {
+  const { client_id, title, description, status, valid_until, notes, total_net, total_vat, total_gross, items } = req.body;
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const offerRes = await client.query(
+      `INSERT INTO offers (client_id, title, description, status, valid_until, notes, total_net, total_vat, total_gross)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [client_id ? parseInt(client_id) : null, title, description, status || 'robocza', valid_until || null, notes, total_net || 0, total_vat || 0, total_gross || 0]
+    );
+    const offer = offerRes.rows[0];
+    
+    const createdItems = [];
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        const itemRes = await client.query(
+          `INSERT INTO offer_items (offer_id, title, description, quantity, unit, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          [offer.id, item.title, item.description, item.quantity || 1, item.unit || 'szt.', item.unit_price_net || 0, item.vat_rate || 23, item.net_amount || 0, item.vat_amount || 0, item.gross_amount || 0]
+        );
+        createdItems.push(itemRes.rows[0]);
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.status(201).json({ ...offer, items: createdItems });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}));
+
+app.put("/api/offers/:id", checkAuth, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { client_id, title, description, status, valid_until, notes, total_net, total_vat, total_gross, items } = req.body;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const offerRes = await client.query(
+      `UPDATE offers SET client_id = $1, title = $2, description = $3, status = $4, valid_until = $5, notes = $6, total_net = $7, total_vat = $8, total_gross = $9, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $10 RETURNING *`,
+      [client_id ? parseInt(client_id) : null, title, description, status, valid_until || null, notes, total_net || 0, total_vat || 0, total_gross || 0, id]
+    );
+    
+    if (offerRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Nie znaleziono oferty" });
+    }
+    
+    const offer = offerRes.rows[0];
+    
+    // Delete old items
+    await client.query(`DELETE FROM offer_items WHERE offer_id = $1`, [id]);
+    
+    const createdItems = [];
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        const itemRes = await client.query(
+          `INSERT INTO offer_items (offer_id, title, description, quantity, unit, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          [id, item.title, item.description, item.quantity || 1, item.unit || 'szt.', item.unit_price_net || 0, item.vat_rate || 23, item.net_amount || 0, item.vat_amount || 0, item.gross_amount || 0]
+        );
+        createdItems.push(itemRes.rows[0]);
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.json({ ...offer, items: createdItems });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}));
+
+app.delete("/api/offers/:id", checkAuth, asyncHandler(async (req, res) => {
+  const { rowCount } = await pool.query("DELETE FROM offers WHERE id = $1", [req.params.id]);
+  if (rowCount === 0) return res.status(404).json({ error: "Nie znaleziono oferty" });
+  res.json({ message: "Oferta została usunięta" });
+}));
+
+app.post("/api/offers/:id/convert", checkAuth, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  
+  // 1. Fetch offer
+  const offerRes = await pool.query("SELECT * FROM offers WHERE id = $1", [id]);
+  if (offerRes.rows.length === 0) return res.status(404).json({ error: "Nie znaleziono oferty" });
+  const offer = offerRes.rows[0];
+  
+  // 2. Create order (zlecenie)
+  const description = offer.description 
+    ? `${offer.description}\n\n(Przekonwertowano z oferty #${offer.id})` 
+    : `Zlecenie utworzone automatycznie z oferty #${offer.id}`;
+  
+  const orderRes = await pool.query(
+    `INSERT INTO orders (title, description, status, price, notes, client_id, deadline)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [
+      offer.title,
+      description,
+      'nowe',
+      offer.total_gross,
+      offer.notes,
+      offer.client_id,
+      offer.valid_until
+    ]
+  );
+  
+  // 3. Update offer status to 'zaakceptowana'
+  await pool.query("UPDATE offers SET status = 'zaakceptowana', updated_at = CURRENT_TIMESTAMP WHERE id = $1", [id]);
+  
+  res.status(201).json({ order: orderRes.rows[0] });
+}));
+
 // --- ACCOUNTING MODULE ---
 
 app.get("/api/accounting/entries", checkAuth, asyncHandler(async (req, res) => {
@@ -332,8 +545,24 @@ app.post("/api/accounting/entries", checkAuth, asyncHandler(async (req, res) => 
 }));
 
 app.delete("/api/accounting/entries/:id", checkAuth, asyncHandler(async (req, res) => {
-  await pool.query("DELETE FROM accounting_entries WHERE id = $1", [req.params.id]);
-  res.json({ message: "Usunięto wpis" });
+  const dbClient = await pool.connect();
+  try {
+    await dbClient.query("BEGIN");
+    // Reset import status in KSeF buffer table
+    await dbClient.query(
+      "UPDATE ksef_invoices SET is_imported = FALSE, accounting_entry_id = NULL WHERE accounting_entry_id = $1",
+      [req.params.id]
+    );
+    // Delete the actual expense entry
+    await dbClient.query("DELETE FROM accounting_entries WHERE id = $1", [req.params.id]);
+    await dbClient.query("COMMIT");
+    res.json({ message: "Usunięto wpis" });
+  } catch (err) {
+    await dbClient.query("ROLLBACK");
+    throw err;
+  } finally {
+    dbClient.release();
+  }
 }));
 
 app.put("/api/accounting/entries/:id", checkAuth, asyncHandler(async (req, res) => {
@@ -341,6 +570,340 @@ app.put("/api/accounting/entries/:id", checkAuth, asyncHandler(async (req, res) 
   const updated = await dynamicUpdate("accounting_entries", req.params.id, req.body, allowed);
   if (!updated) return res.status(404).json({ error: "Nie znaleziono" });
   res.json(updated);
+}));
+
+// --- KSeF 2.0 INTEGRATION ENDPOINTS ---
+
+app.get("/api/accounting/ksef/settings", checkAuth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query("SELECT nip, environment, encrypted_token, last_sync_at FROM ksef_settings LIMIT 1");
+  if (rows.length === 0) {
+    return res.json({ nip: "", environment: "mock", has_token: false, last_sync_at: null });
+  }
+  const settings = rows[0];
+  res.json({
+    nip: settings.nip || "",
+    environment: settings.environment || "mock",
+    has_token: !!settings.encrypted_token,
+    last_sync_at: settings.last_sync_at
+  });
+}));
+
+app.post("/api/accounting/ksef/settings", checkAuth, asyncHandler(async (req, res) => {
+  const { nip, token, environment = "mock" } = req.body;
+  const cleanNip = nip ? nip.trim() : "";
+  const cleanToken = token ? token.trim() : "";
+  
+  let encrypted = null;
+  let iv = null;
+  let tag = null;
+  
+  if (cleanToken) {
+    const encResult = ksefService.encryptToken(cleanToken);
+    encrypted = encResult.encryptedToken;
+    iv = encResult.iv;
+    tag = encResult.tag;
+  }
+  
+  const existingRes = await pool.query("SELECT id, encrypted_token, iv, tag FROM ksef_settings LIMIT 1");
+  if (existingRes.rows.length > 0) {
+    const existing = existingRes.rows[0];
+    const finalToken = cleanToken ? encrypted : existing.encrypted_token;
+    const finalIv = cleanToken ? iv : existing.iv;
+    const finalTag = cleanToken ? tag : existing.tag;
+    
+    await pool.query(
+      `UPDATE ksef_settings 
+       SET nip = $1, encrypted_token = $2, iv = $3, tag = $4, environment = $5, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $6`,
+      [cleanNip, finalToken, finalIv, finalTag, environment, existing.id]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO ksef_settings (nip, encrypted_token, iv, tag, environment) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [cleanNip, encrypted, iv, tag, environment]
+    );
+  }
+
+  // Clear any existing stale session tokens when settings/tokens change
+  await ksefService.clearSessionInDb(pool, cleanNip);
+  
+  res.json({ success: true });
+}));
+
+app.get("/api/accounting/ksef/invoices", checkAuth, asyncHandler(async (req, res) => {
+  const year = parseInt(req.query.year) || new Date().getFullYear();
+  const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
+
+  const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const { rows } = await pool.query(
+    `SELECT * FROM ksef_invoices 
+     WHERE date >= $1 AND date <= $2 
+     ORDER BY date DESC, id DESC`,
+    [dateFrom, dateTo]
+  );
+  
+  res.json(rows);
+}));
+
+app.post("/api/accounting/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
+  const { year, month } = req.body;
+  if (!year || !month) return res.status(400).json({ error: "Brak zdefiniowanego okresu" });
+  
+  const settingsRes = await pool.query("SELECT * FROM ksef_settings LIMIT 1");
+  const settings = settingsRes.rows[0];
+  const env = settings ? settings.environment : "mock";
+
+  try {
+    let decryptedToken = null;
+    if (env !== 'mock') {
+      if (!settings || !settings.encrypted_token || !settings.nip) {
+        return res.status(400).json({ error: "Brak skonfigurowanego połączenia z KSeF (brak NIP lub tokenu)" });
+      }
+      decryptedToken = ksefService.decryptToken(settings.encrypted_token, settings.iv, settings.tag);
+    }
+
+    const invoices = await ksefService.syncInvoicesToDb(
+      pool,
+      settings?.nip || '0000000000',
+      decryptedToken,
+      env,
+      year,
+      month
+    );
+    res.json({ success: true, invoices, last_sync_at: new Date() });
+  } catch (err) {
+    console.error("KSeF sync failed:", err);
+    return res.status(502).json({ error: `Błąd komunikacji z KSeF: ${err.message}` });
+  }
+}));
+
+app.post("/api/accounting/ksef/fetch", checkAuth, asyncHandler(async (req, res) => {
+  const { year, month } = req.body;
+  if (!year || !month) return res.status(400).json({ error: "Brak zdefiniowanego okresu" });
+  
+  const settingsRes = await pool.query("SELECT * FROM ksef_settings LIMIT 1");
+  const settings = settingsRes.rows[0];
+  const env = settings ? settings.environment : "mock";
+
+  let decryptedToken = null;
+  if (env !== 'mock') {
+    if (!settings || !settings.encrypted_token || !settings.nip) {
+      return res.status(400).json({ error: "Brak skonfigurowanego połączenia z KSeF (brak NIP lub tokenu)" });
+    }
+    decryptedToken = ksefService.decryptToken(settings.encrypted_token, settings.iv, settings.tag);
+  }
+
+  try {
+    const invoices = await ksefService.syncInvoicesToDb(
+      pool,
+      settings?.nip || '0000000000',
+      decryptedToken,
+      env,
+      year,
+      month
+    );
+    res.json({ invoices, last_sync_at: new Date().toISOString() });
+  } catch (err) {
+    console.error("KSeF fetch failed:", err);
+
+    // Fallback: Fetch cached invoices from DB for this period
+    const cachedRes = await pool.query(
+      `SELECT * FROM ksef_invoices 
+       WHERE EXTRACT(YEAR FROM date) = $1 AND EXTRACT(MONTH FROM date) = $2
+       ORDER BY date DESC`,
+      [year, month]
+    );
+
+    const isRateLimit = err.message?.includes("429") || err.message?.includes("limit") || err.message?.includes("Rate Limit");
+
+    if (isRateLimit || cachedRes.rows.length > 0) {
+      return res.json({
+        invoices: cachedRes.rows,
+        last_sync_at: settings?.last_sync_at,
+        warning: isRateLimit
+          ? "⏱️ Bramka KSeF (Ministerstwo Finansów) nakłada chwilowy limit zapytań (Rate Limit). Wyświetlono faktury z lokalnej bazy. Zsynchronizuj ponownie za ok. 1 minutę."
+          : `Błąd połączenia z KSeF (${err.message}). Wyświetlono faktury z lokalnej bazy.`
+      });
+    }
+
+    return res.status(502).json({ error: `Błąd komunikacji z KSeF: ${err.message}` });
+  }
+}));
+
+app.post("/api/accounting/ksef/import", checkAuth, asyncHandler(async (req, res) => {
+  const { ksef_reference_number, category, is_car_cost } = req.body;
+  if (!ksef_reference_number) return res.status(400).json({ error: "Brak numeru referencyjnego KSeF" });
+
+  const invRes = await pool.query("SELECT * FROM ksef_invoices WHERE ksef_reference_number = $1", [ksef_reference_number]);
+  if (invRes.rows.length === 0) return res.status(404).json({ error: "Nie znaleziono faktury KSeF" });
+  
+  const inv = invRes.rows[0];
+  if (inv.is_imported) return res.status(400).json({ error: "Faktura została już zaimportowana" });
+
+  const entryType = inv.is_sales ? 'revenue' : 'expense';
+  const desc = inv.is_sales 
+    ? `Sprzedaż KSeF dla: ${inv.contractor_name} (NIP: ${inv.contractor_nip})`
+    : `Zakup KSeF od: ${inv.contractor_name} (NIP: ${inv.contractor_nip})`;
+
+  // Start Transaction
+  const dbClient = await pool.connect();
+  try {
+    await dbClient.query("BEGIN");
+    
+    // Create accounting entry
+    const entryRes = await dbClient.query(
+      `INSERT INTO accounting_entries (
+         date, number, contractor, description, net_amount, vat_rate, vat_amount, gross_amount, category, is_car_cost, entry_type
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+      [
+        inv.date,
+        inv.invoice_number,
+        inv.contractor_name,
+        desc,
+        inv.net_amount,
+        inv.vat_rate || 23,
+        inv.vat_amount,
+        inv.gross_amount,
+        category || (inv.is_sales ? 'Sprzedaż' : 'Inne'),
+        !!is_car_cost,
+        entryType
+      ]
+    );
+    const entryId = entryRes.rows[0].id;
+
+    // Update ksef_invoices
+    await dbClient.query(
+      "UPDATE ksef_invoices SET is_imported = TRUE, accounting_entry_id = $1 WHERE id = $2",
+      [entryId, inv.id]
+    );
+
+    await dbClient.query("COMMIT");
+    res.json({ success: true, entryId, entryType });
+  } catch (err) {
+    await dbClient.query("ROLLBACK");
+    throw err;
+  } finally {
+    dbClient.release();
+  }
+}));
+
+app.post("/api/accounting/ksef/issue", checkAuth, asyncHandler(async (req, res) => {
+  const { 
+    invoice_number, contractor_name, contractor_nip, date, 
+    items, vat_rate, send_to_ksef 
+  } = req.body;
+
+  if (!contractor_name || !date || !items || !items.length) {
+    return res.status(400).json({ error: "Brak wymaganych danych faktury (nabywca, data lub pozycje)" });
+  }
+
+  let totalNet = 0;
+  let totalVat = 0;
+  let totalGross = 0;
+
+  items.forEach(item => {
+    const qty = parseFloat(item.quantity) || 1;
+    const price = parseFloat(item.unit_price) || 0;
+    const rate = parseInt(item.vat_rate || vat_rate || 23, 10);
+    const net = qty * price;
+    const vat = net * (rate / 100);
+    const gross = net + vat;
+    totalNet += net;
+    totalVat += vat;
+    totalGross += gross;
+  });
+
+  const generatedNum = invoice_number || `FV/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
+  const ksefRefNum = `KSEF-OUT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  // Generate official KSeF FA(3) XML
+  const settingsRes = await pool.query("SELECT nip FROM ksef_settings LIMIT 1");
+  const sellerNip = settingsRes.rows[0]?.nip || '6722109643';
+
+  const xmlContent = ksefService.generateKsefFa3Xml({
+    sellerNip,
+    sellerName: 'Usługi i Serwis ERP',
+    buyerNip: contractor_nip,
+    buyerName: contractor_name,
+    invoiceNumber: generatedNum,
+    issueDate: date,
+    saleDate: date,
+    items,
+    totalNet,
+    totalVat,
+    totalGross
+  });
+
+  const dbClient = await pool.connect();
+  try {
+    await dbClient.query("BEGIN");
+
+    // 1. Insert into ksef_invoices as Sales (is_sales = true) with xml_content
+    const invRes = await dbClient.query(`
+      INSERT INTO ksef_invoices (
+        ksef_reference_number, invoice_number, contractor_name, contractor_nip,
+        date, net_amount, vat_rate, vat_amount, gross_amount,
+        is_imported, is_car_cost, suggested_category, is_sales, subject_type, xml_content
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, FALSE, 'Sprzedaż', TRUE, 'Subject1', $10)
+      RETURNING id
+    `, [
+      ksefRefNum,
+      generatedNum,
+      contractor_name,
+      contractor_nip || '0000000000',
+      date,
+      totalNet,
+      vat_rate || 23,
+      totalVat,
+      totalGross,
+      xmlContent
+    ]);
+    const ksefInvId = invRes.rows[0].id;
+
+    // 2. Automatically record in KPiR (Revenue)
+    const entryRes = await dbClient.query(`
+      INSERT INTO accounting_entries (
+        date, number, contractor, description, net_amount, vat_rate, vat_amount, gross_amount, category, entry_type
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Sprzedaż', 'revenue')
+      RETURNING id
+    `, [
+      date,
+      generatedNum,
+      contractor_name,
+      `Wystawiona faktura sprzedaży (KSeF: ${generatedNum})`,
+      totalNet,
+      vat_rate || 23,
+      totalVat,
+      totalGross
+    ]);
+
+    await dbClient.query(
+      "UPDATE ksef_invoices SET accounting_entry_id = $1 WHERE id = $2",
+      [entryRes.rows[0].id, ksefInvId]
+    );
+
+    await dbClient.query("COMMIT");
+    res.json({ 
+      success: true, 
+      invoice_number: generatedNum, 
+      ksef_reference_number: ksefRefNum,
+      gross_amount: totalGross,
+      xml_content: xmlContent,
+      message: send_to_ksef 
+        ? "Faktura została wystawiona w standardzie FA(3) i zgłoszona do KSeF!" 
+        : "Faktura została wystawiona w standardzie FA(3) i zarejestrowana!"
+    });
+  } catch (err) {
+    await dbClient.query("ROLLBACK");
+    console.error("Failed to issue invoice:", err);
+    res.status(500).json({ error: "Błąd podczas wystawiania faktury: " + err.message });
+  } finally {
+    dbClient.release();
+  }
 }));
 
 
@@ -427,24 +990,25 @@ app.get("/api/accounting/stats", checkAuth, asyncHandler(async (req, res) => {
   const vatToPay = Math.max(0, totalVatOutput - totalVatInput - carriedVat);
   const nextMonthCarriedVat = Math.max(0, carriedVat + totalVatInput - totalVatOutput);
   
-  // USTAWY DLA TWOJEJ SYTUACJI:
-  // 1. Kwota wolna (30k) JEST JUŻ NA ETACIE -> nie odliczamy jej tutaj.
-  // 2. Próg 120k (10k miesięcznie) jest wspólny.
-  // 3. Masz ok. 7000 zł brutto z etatu, więc dla JDG zostaje 3000 zł w progu 12%.
-  
-  const ETAT_BRUTTO = 7000; 
-  const MONTHLY_THRESHOLD = 10000;
-  const available12PercentSpace = Math.max(0, MONTHLY_THRESHOLD - ETAT_BRUTTO);
-  
+  // Sytuacja podatkowa: Student < 26 lat na etacie (PIT-0 dla młodych).
+  // 1. Etat jest zwolniony z PIT do 85 528 zł rocznie (nie zużywa kwoty wolnej ani 1. progu).
+  // 2. JDG ma do dyspozycji PEŁNĄ kwotę wolną od podatku: 30 000 zł rocznie = 2 500 zł / mies.
+  // 3. JDG ma do dyspozycji PEŁNY 1. próg 12%: 120 000 zł rocznie = 10 000 zł / mies.
+  // 4. Stawka 32% obowiązuje dopiero od dochodu JDG powyżej 10 000 zł / mies.
+
+  const MONTHLY_TAX_FREE = 2500;   // 30 000 zł / 12
+  const MONTHLY_THRESHOLD = 10000; // 120 000 zł / 12
+
   let estimatedPit = 0;
-  if (income > 0) {
-    const amountIn12Percent = Math.min(income, available12PercentSpace);
-    const amountIn32Percent = Math.max(0, income - available12PercentSpace);
-    
-    estimatedPit = (amountIn12Percent * 0.12) + (amountIn32Percent * 0.32);
+  if (income > MONTHLY_TAX_FREE) {
+    if (income <= MONTHLY_THRESHOLD) {
+      estimatedPit = (income - MONTHLY_TAX_FREE) * 0.12;
+    } else {
+      estimatedPit = ((MONTHLY_THRESHOLD - MONTHLY_TAX_FREE) * 0.12) + ((income - MONTHLY_THRESHOLD) * 0.32);
+    }
   }
-  
-  // ZUS Zdrowotna (Skala 9%): Zawsze 9% od dochodu, min. 432.54 zł
+
+  // ZUS Zdrowotna (Skala 9%): Zbieg tytułów z etatem -> płacisz tylko zdrowotną (9% od dochodu, min. 432.54 zł)
   const healthInsurance = income > 0 ? Math.max(432.54, income * 0.09) : 432.54;
 
 

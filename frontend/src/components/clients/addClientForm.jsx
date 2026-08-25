@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { formatPhoneInput } from "./utils";
 
-export default function AddClientForm({ onClientAdded }) {
-  // Stan trzymamy w jednym obiekcie - najprostsze rozwiązanie
+export default function AddClientForm({ onClientAdded, hideHeader = false }) {
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -9,39 +9,38 @@ export default function AddClientForm({ onClientAdded }) {
     email: "",
     nip: "",
     address: "",
-    type: "osoba_prywatna", // Domyślna wartość
+    type: "osoba_prywatna",
     company_name: "",
   });
 
   const [loading, setLoading] = useState(false);
 
-  // Funkcja obsługująca zmiany w inputach
   const handleChange = (e) => {
-    // Wyciągamy name i value z inputa, który wywołał zdarzenie
     const { name, value } = e.target;
-
+    if (name === "phone") {
+      setFormData((prev) => ({
+        ...prev,
+        phone: formatPhoneInput(value),
+      }));
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  // Wysyłka formularza
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    // Prosta walidacja "na ifach"
     if (formData.type === "firma" && !formData.company_name) {
       alert("Proszę podać nazwę firmy!");
       setLoading(false);
       return;
     }
 
-    console.log("Wysyłanie formularza:", formData); // Debug dla studenta
-
     try {
-      // Pobranie tokena z localStorage (ręcznie, bez helperów)
       const authStorage = localStorage.getItem("auth");
       const token = authStorage ? JSON.parse(authStorage).token : null;
 
@@ -49,7 +48,7 @@ export default function AddClientForm({ onClientAdded }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // Doklejamy token
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(formData),
       });
@@ -59,14 +58,11 @@ export default function AddClientForm({ onClientAdded }) {
       }
 
       const createdClient = await response.json();
-      console.log("Sukces, dodano:", createdClient);
 
-      // Jeśli komponent nadrzędny przekazał funkcję odświeżającą, to ją wywołaj
       if (onClientAdded) {
         onClientAdded(createdClient);
       }
 
-      // Reset formularza
       setFormData({
         first_name: "",
         last_name: "",
@@ -78,8 +74,6 @@ export default function AddClientForm({ onClientAdded }) {
         company_name: "",
       });
 
-      alert("Dodano nowego klienta!");
-
     } catch (error) {
       console.error("Błąd zapisu:", error);
       alert("Wystąpił błąd podczas dodawania klienta.");
@@ -90,81 +84,28 @@ export default function AddClientForm({ onClientAdded }) {
 
   return (
     <div className="client-form-container">
-      <h3>Dodaj nowego klienta</h3>
+      {!hideHeader && <h3 style={{ marginTop: 0, marginBottom: 16 }}>Dodaj nowego klienta</h3>}
 
       <form onSubmit={handleSubmit}>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Imię</label>
-            <input
-              type="text"
-              name="first_name"
-              value={formData.first_name}
-              onChange={handleChange}
-              className="form-input"
-              required
-              placeholder="Jan"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Nazwisko</label>
-            <input
-              type="text"
-              name="last_name"
-              value={formData.last_name}
-              onChange={handleChange}
-              className="form-input"
-              placeholder="Kowalski"
-            />
-          </div>
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label>Telefon</label>
-            <input
-              type="text"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="form-input"
-              placeholder="123 456 789"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="form-input"
-              placeholder="jan@firma.pl"
-            />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Typ klienta</label>
+        <div className="form-group" style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Typ klienta</label>
           <select
             name="type"
             value={formData.type}
             onChange={handleChange}
             className="form-select"
+            style={{ width: '100%', height: '42px', borderRadius: '8px' }}
           >
-            <option value="osoba_prywatna">Osoba prywatna</option>
-            <option value="firma">Firma</option>
+            <option value="osoba_prywatna">👤 Osoba prywatna</option>
+            <option value="firma">🏢 Firma (B2B)</option>
           </select>
         </div>
 
-        {/* Sekcja widoczna tylko dla firm - proste warunkowe renderowanie */}
         {formData.type === "firma" && (
-          <div className="company-details-box">
-            <div className="form-row">
-              <div className="form-group">
-                <label>NIP</label>
+          <div className="company-details-box" style={{ background: 'rgba(79, 70, 229, 0.04)', padding: '14px', borderRadius: '10px', marginBottom: '14px', border: '1px solid rgba(79, 70, 229, 0.15)' }}>
+            <div className="form-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>NIP</label>
                 <input
                   type="text"
                   name="nip"
@@ -172,26 +113,86 @@ export default function AddClientForm({ onClientAdded }) {
                   onChange={handleChange}
                   className="form-input"
                   placeholder="000-000-00-00"
+                  style={{ width: '100%', height: '40px' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Nazwa Firmy *</label>
+              <div className="form-group" style={{ flex: 2, minWidth: '180px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Nazwa Firmy *</label>
                 <input
                   type="text"
                   name="company_name"
                   value={formData.company_name}
                   onChange={handleChange}
                   className="form-input"
-                  placeholder="Pełna nazwa"
+                  placeholder="Pełna nazwa firmy Sp. z o.o."
+                  required={formData.type === "firma"}
+                  style={{ width: '100%', height: '40px' }}
                 />
               </div>
             </div>
           </div>
         )}
 
-        <div className="form-group">
-          <label>Adres</label>
+        <div className="form-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: 14 }}>
+          <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Imię</label>
+            <input
+              type="text"
+              name="first_name"
+              value={formData.first_name}
+              onChange={handleChange}
+              className="form-input"
+              required={formData.type !== "firma"}
+              placeholder="Jan"
+              style={{ width: '100%', height: '40px' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Nazwisko</label>
+            <input
+              type="text"
+              name="last_name"
+              value={formData.last_name}
+              onChange={handleChange}
+              className="form-input"
+              placeholder="Kowalski"
+              style={{ width: '100%', height: '40px' }}
+            />
+          </div>
+        </div>
+
+        <div className="form-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: 14 }}>
+          <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Telefon</label>
+            <input
+              type="text"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              className="form-input"
+              placeholder="+48-517-190-673"
+              style={{ width: '100%', height: '40px' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Email</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className="form-input"
+              placeholder="jan@firma.pl"
+              style={{ width: '100%', height: '40px' }}
+            />
+          </div>
+        </div>
+
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Adres</label>
           <input
             type="text"
             name="address"
@@ -199,12 +200,13 @@ export default function AddClientForm({ onClientAdded }) {
             onChange={handleChange}
             className="form-input"
             placeholder="Ulica, nr domu, miasto"
+            style={{ width: '100%', height: '40px' }}
           />
         </div>
 
-        <div className="form-actions">
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? "Zapisywanie..." : "Dodaj klienta"}
+        <div className="form-actions" style={{ textAlign: "right" }}>
+          <button type="submit" className="btn btn-primary" style={{ width: "100%", height: "42px", fontWeight: 600 }} disabled={loading}>
+            {loading ? "Dodawanie..." : "+ Dodaj klienta"}
           </button>
         </div>
       </form>

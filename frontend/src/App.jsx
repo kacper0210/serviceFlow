@@ -10,6 +10,7 @@ import Login from "./components/auth/Login";
 import Settings from "./components/settings/Settings";
 import Users from "./components/users/Users";
 import Accounting from "./components/accounting/Accounting";
+import OffersList from "./components/offers/OffersList";
 
 
 export default function App() {
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="/" element={<PrivateRoute auth={auth}><Dashboard /></PrivateRoute>} />
           <Route path="/clients" element={<PrivateRoute auth={auth}><ClientsList /></PrivateRoute>} />
           <Route path="/orders" element={<PrivateRoute auth={auth}><OrdersList /></PrivateRoute>} />
+          <Route path="/offers" element={<PrivateRoute auth={auth}><OffersList /></PrivateRoute>} />
           <Route path="/calendar" element={<PrivateRoute auth={auth}><OrdersCalendar /></PrivateRoute>} />
           <Route path="/accounting" element={<PrivateRoute auth={auth}><Accounting /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute auth={auth}><Settings /></PrivateRoute>} />
@@ -110,6 +112,7 @@ function Navbar({ user }) {
         <NavLink to="/clients" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Klienci</NavLink>
         <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Kalendarz</NavLink>
         <NavLink to="/accounting" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Księgowość</NavLink>
+        <NavLink to="/offers" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Oferty</NavLink>
         {user.role === "admin" && (
           <NavLink to="/users" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Użytkownicy</NavLink>
         )}

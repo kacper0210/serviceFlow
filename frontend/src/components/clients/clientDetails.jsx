@@ -88,7 +88,30 @@ export default function ClientDetails({ clientId, onClose }) {
 
             <div className="detail-row">
               <span className="label">Telefon:</span>
-              <span className="value">{client.phone}</span>
+              <span className="value">
+                {client.phone ? (
+                  <a 
+                    href={`tel:${client.phone.replace(/\s+/g, '')}`} 
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#22c55e',
+                      color: '#ffffff',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      textDecoration: 'none'
+                    }}
+                    title="Kliknij, aby zadzwonić"
+                  >
+                    📞 {client.phone} (Zadzwoń)
+                  </a>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)' }}>Brak telefonu</span>
+                )}
+              </span>
             </div>
 
             <div className="detail-row">

@@ -4,31 +4,31 @@
 }
 
 .users-title {
-    font-size: 1.5rem;
-    font-weight: 800;
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--text-main);
-    margin-bottom: 24px;
-    letter-spacing: -0.025em;
+    margin-bottom: 20px;
+    letter-spacing: -0.03em;
 }
 
 .users-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 32px;
-    margin-bottom: 32px;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
     box-shadow: var(--card-shadow);
 }
 
 .users-section-title {
     margin-top: 0;
-    margin-bottom: 24px;
-    font-size: 1.1rem;
-    font-weight: 700;
+    margin-bottom: 20px;
+    font-size: 1rem;
+    font-weight: 600;
     color: var(--text-main);
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .users-form {
@@ -41,36 +41,36 @@
 .users-input,
 .users-select {
     width: 100%;
-    padding: 12px 16px;
-    border-radius: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
     border: 1px solid var(--border-color);
     background: var(--input-bg);
     color: var(--input-text);
-    font-size: 0.95rem;
-    transition: all 0.2s;
+    font-size: 0.9rem;
+    transition: all 0.15s ease;
 }
 
 .users-input:focus,
 .users-select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 4px var(--primary-light);
+    box-shadow: 0 0 0 2px var(--primary-light);
 }
 
 .users-checkbox-label {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
+    font-weight: 500;
+    font-size: 0.85rem;
     color: var(--text-main);
-    padding: 12px 0;
+    padding: 10px 0;
 }
 
 .table-wrapper {
     background: var(--bg-card);
-    border-radius: 16px;
+    border-radius: 8px;
     border: 1px solid var(--border-color);
     box-shadow: var(--card-shadow);
     overflow-x: auto;
@@ -84,10 +84,10 @@
 
 .users-table th {
     background: var(--bg-gray);
-    padding: 16px 20px;
+    padding: 14px 20px;
     text-align: left;
-    font-size: 0.8rem;
-    font-weight: 700;
+    font-size: 0.75rem;
+    font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -95,10 +95,10 @@
 }
 
 .users-table td {
-    padding: 16px 20px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--border-color);
     color: var(--text-main);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
 }
 
 .users-table tr:last-child td {
@@ -106,7 +106,7 @@
 }
 
 .users-table tr:hover {
-    background-color: rgba(0, 0, 0, 0.01);
+    background-color: rgba(79, 70, 229, 0.02);
 }
 
 body.dark-mode .users-table tr:hover {
@@ -118,23 +118,29 @@ body.dark-mode .users-table tr:hover {
     font-size: 0.85rem;
     padding: 6px 12px;
     border-radius: 6px;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
 }
 
 .users-btn-change-pass {
     color: var(--primary-color);
     background: var(--primary-light);
+    border: 1px solid rgba(79, 70, 229, 0.15);
 }
 
 .users-btn-delete {
     color: var(--danger-color);
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
-.users-btn-change-pass:hover,
+.users-btn-change-pass:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
 .users-btn-delete:hover {
-    filter: brightness(0.95);
-    transform: translateY(-1px);
+    background: var(--danger-color);
+    color: white;
 }
 
 @media (max-width: 768px) {
@@ -163,9 +169,9 @@ body.dark-mode .users-table tr:hover {
   .users-table tr {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
+    border-radius: 8px;
     margin-bottom: 16px;
-    padding: 12px;
+    padding: 8px 12px;
     box-shadow: var(--card-shadow);
   }
 
@@ -175,10 +181,11 @@ body.dark-mode .users-table tr:hover {
     position: relative;
     padding-left: 45% !important; 
     text-align: right;
-    min-height: 45px;
+    min-height: 40px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    font-size: 0.85rem;
   }
 
   .users-table td:last-child {
@@ -191,10 +198,10 @@ body.dark-mode .users-table tr:hover {
     width: 40%; 
     white-space: nowrap;
     content: attr(data-label);
-    font-weight: 800;
+    font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
     text-align: left;
   }
-}
+}
