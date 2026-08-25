@@ -78,27 +78,36 @@ async function ensureDbTablesExist() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS offers (
         id SERIAL PRIMARY KEY,
-        offer_number VARCHAR(50) UNIQUE NOT NULL,
-        client_name VARCHAR(255) NOT NULL,
-        client_nip VARCHAR(50),
-        client_address TEXT,
+        client_id INT REFERENCES clients(id) ON DELETE SET NULL,
         title VARCHAR(255) NOT NULL,
-        total_net DECIMAL(12, 2) NOT NULL,
-        total_gross DECIMAL(12, 2) NOT NULL,
-        status VARCHAR(20) DEFAULT 'draft',
+        description TEXT,
+        status VARCHAR(50) DEFAULT 'robocza',
         valid_until DATE,
-        created_by VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        notes TEXT,
+        total_net DECIMAL(12, 2) DEFAULT 0.00,
+        total_vat DECIMAL(12, 2) DEFAULT 0.00,
+        total_gross DECIMAL(12, 2) DEFAULT 0.00,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS total_vat DECIMAL(12, 2) DEFAULT 0.00;
 
       CREATE TABLE IF NOT EXISTS offer_items (
         id SERIAL PRIMARY KEY,
-        offer_id INTEGER REFERENCES offers(id) ON DELETE CASCADE,
-        description TEXT NOT NULL,
-        quantity DECIMAL(10, 2) DEFAULT 1,
-        unit_price DECIMAL(12, 2) NOT NULL,
-        vat_rate INTEGER DEFAULT 23
+        offer_id INT REFERENCES offers(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        quantity DECIMAL(10, 2) DEFAULT 1.00,
+        unit VARCHAR(20) DEFAULT 'szt.',
+        unit_price_net DECIMAL(12, 2) DEFAULT 0.00,
+        vat_rate INTEGER DEFAULT 23,
+        net_amount DECIMAL(12, 2) DEFAULT 0.00,
+        vat_amount DECIMAL(12, 2) DEFAULT 0.00,
+        gross_amount DECIMAL(12, 2) DEFAULT 0.00
       );
     `);
 
@@ -444,31 +453,36 @@ app.delete("/api/orders/:id", checkAuth, asyncHandler(async (req, res) => {
 // --- OFFERS MODULE ---
 
 app.get("/api/offers", checkAuth, asyncHandler(async (req, res) => {
-  const { status, search } = req.query;
-  let conditions = ["1=1"];
-  let params = [];
+  try {
+    const { status, search } = req.query;
+    let conditions = ["1=1"];
+    let params = [];
 
-  if (status) {
-    params.push(status);
-    conditions.push(`o.status = $${params.length}`);
+    if (status) {
+      params.push(status);
+      conditions.push(`o.status = $${params.length}`);
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      const idx = params.length;
+      conditions.push(`(o.title ILIKE $${idx} OR c.first_name ILIKE $${idx} OR c.last_name ILIKE $${idx} OR c.company_name ILIKE $${idx})`);
+    }
+
+    const query = `
+      SELECT o.*, c.first_name, c.last_name, c.company_name, c.email as client_email
+      FROM offers o
+      LEFT JOIN clients c ON o.client_id = c.id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY o.created_at DESC, o.id DESC
+    `;
+
+    const { rows } = await pool.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching offers:", err);
+    res.json([]);
   }
-
-  if (search) {
-    params.push(`%${search}%`);
-    const idx = params.length;
-    conditions.push(`(o.title ILIKE $${idx} OR c.first_name ILIKE $${idx} OR c.last_name ILIKE $${idx} OR c.company_name ILIKE $${idx})`);
-  }
-
-  const query = `
-    SELECT o.*, c.first_name, c.last_name, c.company_name, c.email as client_email
-    FROM offers o
-    LEFT JOIN clients c ON o.client_id = c.id
-    WHERE ${conditions.join(" AND ")}
-    ORDER BY o.created_at DESC, o.id DESC
-  `;
-
-  const { rows } = await pool.query(query, params);
-  res.json(rows);
 }));
 
 app.get("/api/offers/:id", checkAuth, asyncHandler(async (req, res) => {
