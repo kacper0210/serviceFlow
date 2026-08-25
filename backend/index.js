@@ -121,11 +121,15 @@ async function ensureDbTablesExist() {
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS description TEXT;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS quantity DECIMAL(10, 2) DEFAULT 1.00;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'szt.';
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12, 2) DEFAULT 0.00;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit_price_net DECIMAL(12, 2) DEFAULT 0.00;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS vat_rate INTEGER DEFAULT 23;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS net_amount DECIMAL(12, 2) DEFAULT 0.00;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS vat_amount DECIMAL(12, 2) DEFAULT 0.00;
       ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS gross_amount DECIMAL(12, 2) DEFAULT 0.00;
+
+      ALTER TABLE offer_items ALTER COLUMN unit_price DROP NOT NULL;
+      ALTER TABLE offer_items ALTER COLUMN unit_price_net DROP NOT NULL;
     `);
 
     console.log("[DB Migration] All required DB tables verified successfully!");
@@ -565,16 +569,20 @@ app.post("/api/offers", checkAuth, asyncHandler(async (req, res) => {
     const createdItems = [];
     if (items && Array.isArray(items)) {
       for (const item of items) {
+        const pNet = item.unit_price_net !== undefined ? item.unit_price_net : (item.unit_price || 0);
         const itemRes = await client.query(
-          `INSERT INTO offer_items (offer_id, title, description, quantity, unit, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          `INSERT INTO offer_items (
+             offer_id, title, description, quantity, unit, 
+             unit_price, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
           [
             offer.id, 
             item.title || 'Pozycja', 
             item.description || '', 
             item.quantity || 1, 
             item.unit || 'szt.', 
-            item.unit_price_net || 0, 
+            pNet,
+            pNet, 
             item.vat_rate || 23, 
             item.net_amount || 0, 
             item.vat_amount || 0, 
@@ -623,10 +631,25 @@ app.put("/api/offers/:id", checkAuth, asyncHandler(async (req, res) => {
     const createdItems = [];
     if (items && Array.isArray(items)) {
       for (const item of items) {
+        const pNet = item.unit_price_net !== undefined ? item.unit_price_net : (item.unit_price || 0);
         const itemRes = await client.query(
-          `INSERT INTO offer_items (offer_id, title, description, quantity, unit, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-          [id, item.title, item.description, item.quantity || 1, item.unit || 'szt.', item.unit_price_net || 0, item.vat_rate || 23, item.net_amount || 0, item.vat_amount || 0, item.gross_amount || 0]
+          `INSERT INTO offer_items (
+             offer_id, title, description, quantity, unit, 
+             unit_price, unit_price_net, vat_rate, net_amount, vat_amount, gross_amount
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+          [
+            id, 
+            item.title || 'Pozycja', 
+            item.description || '', 
+            item.quantity || 1, 
+            item.unit || 'szt.', 
+            pNet,
+            pNet, 
+            item.vat_rate || 23, 
+            item.net_amount || 0, 
+            item.vat_amount || 0, 
+            item.gross_amount || 0
+          ]
         );
         createdItems.push(itemRes.rows[0]);
       }
