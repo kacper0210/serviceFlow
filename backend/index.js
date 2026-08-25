@@ -106,7 +106,7 @@ async function ensureDbTablesExist() {
       CREATE TABLE IF NOT EXISTS offer_items (
         id SERIAL PRIMARY KEY,
         offer_id INT REFERENCES offers(id) ON DELETE CASCADE,
-        title VARCHAR(255) NOT NULL,
+        title VARCHAR(255),
         description TEXT,
         quantity DECIMAL(10, 2) DEFAULT 1.00,
         unit VARCHAR(20) DEFAULT 'szt.',
@@ -116,6 +116,16 @@ async function ensureDbTablesExist() {
         vat_amount DECIMAL(12, 2) DEFAULT 0.00,
         gross_amount DECIMAL(12, 2) DEFAULT 0.00
       );
+
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS quantity DECIMAL(10, 2) DEFAULT 1.00;
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'szt.';
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit_price_net DECIMAL(12, 2) DEFAULT 0.00;
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS vat_rate INTEGER DEFAULT 23;
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS net_amount DECIMAL(12, 2) DEFAULT 0.00;
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS vat_amount DECIMAL(12, 2) DEFAULT 0.00;
+      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS gross_amount DECIMAL(12, 2) DEFAULT 0.00;
     `);
 
     console.log("[DB Migration] All required DB tables verified successfully!");
