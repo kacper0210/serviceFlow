@@ -46,12 +46,6 @@ export default function Login() {
     }
   };
 
-  const handleUseDemo = () => {
-    setEmail("admin@example.com");
-    setPassword("admin123");
-    setError("");
-  };
-
   return (
     <div className="premium-login-container">
       {/* Background Ambient Glow Orbs */}
@@ -112,16 +106,6 @@ export default function Login() {
             {loading ? "Weryfikacja..." : "Zaloguj się"}
           </button>
         </form>
-
-        <div className="demo-footer">
-          <button
-            type="button"
-            className="demo-link-btn"
-            onClick={handleUseDemo}
-          >
-            Użyj danych testowych
-          </button>
-        </div>
       </div>
     </div>
   );
