@@ -1,5 +1,22 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import AddEntryForm from "./AddEntryForm";
+
+const SortIcon = ({ col, sortConfig }) => {
+  const isActive = sortConfig.key === col;
+  return (
+    <span style={{ 
+      display: 'inline-block', 
+      width: '12px', 
+      textAlign: 'center', 
+      opacity: isActive ? 0.9 : 0.3,
+      marginLeft: col === 'date' || col === 'number' || col === 'contractor' || col === 'category' ? 5 : 0,
+      marginRight: col === 'net_amount' || col === 'vat_amount' || col === 'gross_amount' ? 5 : 0,
+      fontSize: '0.65rem'
+    }}>
+      {isActive ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}
+    </span>
+  );
+};
 
 export default function EntriesList({ type }) {
   const [entries, setEntries] = useState([]);
@@ -12,12 +29,12 @@ export default function EntriesList({ type }) {
   const [collapsedMonths, setCollapsedMonths] = useState({});
   const [expandedRows, setExpandedRows] = useState({});
 
-  const toggleMonth = (mKey) => {
+  const toggleMonth = useCallback((mKey) => {
     setCollapsedMonths(prev => ({
       ...prev,
       [mKey]: !prev[mKey]
     }));
-  };
+  }, []);
 
   const labels = type === "revenue" ? {
     btn: "+ Dodaj Fakturę Sprzedaży",
@@ -186,24 +203,6 @@ export default function EntriesList({ type }) {
     fetchEntries();
   }, [type]);
 
-  const SortIcon = ({ col }) => {
-    const isActive = sortConfig.key === col;
-    return (
-      <span style={{ 
-        display: 'inline-block', 
-        width: '12px', 
-        textAlign: 'center', 
-        opacity: isActive ? 0.9 : 0.3,
-        marginLeft: col === 'date' || col === 'number' || col === 'contractor' || col === 'category' ? 5 : 0,
-        marginRight: col === 'net_amount' || col === 'vat_amount' || col === 'gross_amount' ? 5 : 0,
-        fontSize: '0.65rem'
-      }}>
-        {isActive ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}
-      </span>
-    );
-  };
-
-
   return (
     <div className="expenses-list">
       <div className="actions-bar" style={{ flexWrap: 'wrap' }}>
@@ -280,12 +279,12 @@ export default function EntriesList({ type }) {
           <thead>
             <tr>
               <th style={{ width: '40px', textAlign: 'center' }}></th>
-              <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>Data <SortIcon col="date" /></th>
-              <th onClick={() => requestSort('number')} style={{ cursor: 'pointer' }}>Nr Dokumentu <SortIcon col="number" /></th>
-              <th onClick={() => requestSort('contractor')} style={{ cursor: 'pointer' }}>{type === "revenue" ? "Klient" : "Kontrahent"} <SortIcon col="contractor" /></th>
-              <th onClick={() => requestSort('net_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="net_amount" /> Netto</th>
-              <th onClick={() => requestSort('vat_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="vat_amount" /> VAT</th>
-              <th onClick={() => requestSort('gross_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="gross_amount" /> Brutto</th>
+              <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>Data <SortIcon col="date" sortConfig={sortConfig} /></th>
+              <th onClick={() => requestSort('number')} style={{ cursor: 'pointer' }}>Nr Dokumentu <SortIcon col="number" sortConfig={sortConfig} /></th>
+              <th onClick={() => requestSort('contractor')} style={{ cursor: 'pointer' }}>{type === "revenue" ? "Klient" : "Kontrahent"} <SortIcon col="contractor" sortConfig={sortConfig} /></th>
+              <th onClick={() => requestSort('net_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="net_amount" sortConfig={sortConfig} /> Netto</th>
+              <th onClick={() => requestSort('vat_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="vat_amount" sortConfig={sortConfig} /> VAT</th>
+              <th onClick={() => requestSort('gross_amount')} className="text-right" style={{ cursor: 'pointer' }}><SortIcon col="gross_amount" sortConfig={sortConfig} /> Brutto</th>
               <th className="text-right">Akcje</th>
             </tr>
           </thead>

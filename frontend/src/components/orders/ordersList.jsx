@@ -1,8 +1,38 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import AddOrderForm from "./addOrderForm";
 import EditOrderForm from "./editOrderForm";
 import OrderDetails from "./orderDetails";
+
+const STATUS_OPTIONS = [
+  { key: 'nowe', label: 'Nowe', color: '#3b82f6', badgeBg: 'rgba(59, 130, 246, 0.15)' },
+  { key: 'w_trakcie', label: 'W realizacji', color: '#f59e0b', badgeBg: 'rgba(245, 158, 11, 0.15)' },
+  { key: 'zakonczone', label: 'Zakończone', color: '#10b981', badgeBg: 'rgba(16, 185, 129, 0.15)' },
+  { key: 'wstrzymane', label: 'Wstrzymane', color: '#ef4444', badgeBg: 'rgba(239, 68, 68, 0.15)' }
+];
+
+const getStatusBadge = (status) => {
+  if (!status) return { label: "-", className: "" };
+  const st = status.toLowerCase();
+  if (st === "completed" || st === "zakonczone" || st === "zakończone") {
+    return { label: "Zakończone", className: "status-zakonczone" };
+  }
+  if (st === "in_progress" || st === "w_trakcie" || st === "w realizacji") {
+    return { label: "W realizacji", className: "status-w_trakcie" };
+  }
+  if (st === "new" || st === "nowe") {
+    return { label: "Nowe", className: "status-nowe" };
+  }
+  if (st === "on_hold" || st === "wstrzymane") {
+    return { label: "Wstrzymane", className: "status-wstrzymane" };
+  }
+  return { label: status, className: `status-${st}` };
+};
+
+const SortIcon = ({ active, direction }) => {
+  if (!active) return <span style={{ opacity: 0.25, marginLeft: 4, fontSize: '0.75rem' }}>↕</span>;
+  return <span style={{ color: "var(--primary-color)", marginLeft: 4, fontWeight: "bold", fontSize: '0.8rem' }}>{direction === 'asc' ? '▲' : '▼'}</span>;
+};
 
 export default function OrdersList() {
   const location = useLocation();
@@ -18,13 +48,6 @@ export default function OrdersList() {
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState("list");
 
-  const STATUS_OPTIONS = [
-    { key: 'nowe', label: 'Nowe', color: '#3b82f6', badgeBg: 'rgba(59, 130, 246, 0.15)' },
-    { key: 'w_trakcie', label: 'W realizacji', color: '#f59e0b', badgeBg: 'rgba(245, 158, 11, 0.15)' },
-    { key: 'zakonczone', label: 'Zakończone', color: '#10b981', badgeBg: 'rgba(16, 185, 129, 0.15)' },
-    { key: 'wstrzymane', label: 'Wstrzymane', color: '#ef4444', badgeBg: 'rgba(239, 68, 68, 0.15)' }
-  ];
-
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const statusParam = params.get("status");
@@ -34,7 +57,7 @@ export default function OrdersList() {
     }
   }, [location.search]);
 
-  const toggleStatusFilter = (statusKey) => {
+  const toggleStatusFilter = useCallback((statusKey) => {
     setSelectedStatuses(prev => {
       if (prev.includes(statusKey)) {
         return prev.filter(k => k !== statusKey);
@@ -43,124 +66,14 @@ export default function OrdersList() {
       }
     });
     setCurrentPage(1);
-  };
-
-  const clearStatusFilter = () => {
-    setSelectedStatuses([]);
-    setCurrentPage(1);
-  };
-
-  const availableMonths = useMemo(() => {
-    const monthsSet = new Set();
-    orders.forEach(order => {
-      const dateStr = order.deadline || order.created_at;
-      if (dateStr) {
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) {
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          monthsSet.add(key);
-        }
-      }
-    });
-
-    const now = new Date();
-    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    monthsSet.add(currentKey);
-
-    return Array.from(monthsSet).sort().reverse().map(key => {
-      const [year, month] = key.split('-');
-      const monthNames = [
-        "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
-        "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
-      ];
-      const label = `${monthNames[parseInt(month, 10) - 1]} ${year}`;
-      return { key, label };
-    });
-  }, [orders]);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editOrder, setEditOrder] = useState(null);
-  const [detailsId, setDetailsId] = useState(null);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const authData = JSON.parse(localStorage.getItem("auth"));
-      const token = authData?.token;
-      const headers = { "Authorization": `Bearer ${token}` };
-
-      const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, { headers });
-      const ordersData = await ordersRes.json();
-
-      const clientsRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients`, { headers });
-      const clientsData = await clientsRes.json();
-
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setClients(Array.isArray(clientsData) ? clientsData : []);
-
-    } catch (err) {
-      console.error(err);
-      alert("Błąd pobierania danych");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Czy na pewno chcesz usunąć to zlecenie?")) return;
+  const clearStatusFilter = useCallback(() => {
+    setSelectedStatuses([]);
+    setCurrentPage(1);
+  }, []);
 
-    try {
-      const authData = JSON.parse(localStorage.getItem("auth"));
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${authData?.token}` }
-      });
-      setOrders(prev => prev.filter(o => o.id !== id));
-    } catch (err) {
-      alert("Nie udało się usunąć.");
-    }
-  };
-
-  const [quickTitle, setQuickTitle] = useState("");
-  const [quickLoading, setQuickLoading] = useState(false);
-
-  const handleQuickAddOrder = async (e) => {
-    e.preventDefault();
-    if (!quickTitle.trim()) return;
-
-    setQuickLoading(true);
-    try {
-      const authData = JSON.parse(localStorage.getItem("auth"));
-      const token = authData?.token;
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: quickTitle.trim(),
-          status: "nowe"
-        })
-      });
-
-      if (res.ok) {
-        const newOrder = await res.json();
-        setOrders(prev => [newOrder, ...prev]);
-        setQuickTitle("");
-      }
-    } catch (err) {
-      console.error("Błąd szybkiego dodawania zlecenia:", err);
-    } finally {
-      setQuickLoading(false);
-    }
-  };
-
-  const getClientDisplayName = (order) => {
+  const getClientDisplayName = useCallback((order) => {
     if (order.company_name) return order.company_name;
     if (order.first_name || order.last_name) return `${order.first_name || ''} ${order.last_name || ''}`.trim();
     if (order.client_id) {
@@ -172,110 +85,93 @@ export default function OrdersList() {
       }
     }
     return "👤 Brak klienta";
-  };
-
-  const getStatusBadge = (status) => {
-    if (!status) return { label: "-", className: "" };
-    const st = status.toLowerCase();
-    if (st === "completed" || st === "zakonczone" || st === "zakończone") {
-      return { label: "Zakończone", className: "status-zakonczone" };
-    }
-    if (st === "in_progress" || st === "w_trakcie" || st === "w realizacji") {
-      return { label: "W realizacji", className: "status-w_trakcie" };
-    }
-    if (st === "new" || st === "nowe") {
-      return { label: "Nowe", className: "status-nowe" };
-    }
-    if (st === "on_hold" || st === "wstrzymane") {
-      return { label: "Wstrzymane", className: "status-wstrzymane" };
-    }
-    return { label: status, className: `status-${st}` };
-  };
+  }, [clients]);
 
   const [sortField, setSortField] = useState("id");
   const [sortDirection, setSortDirection] = useState("desc");
 
-  const handleSort = (field) => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
+  const handleSort = useCallback((field) => {
+    setSortField(prevField => {
+      if (prevField === field) {
+        setSortDirection(prevDir => (prevDir === 'asc' ? 'desc' : 'asc'));
+        return field;
+      }
       setSortDirection('asc');
-    }
-  };
+      return field;
+    });
+  }, []);
 
-  const renderSortIcon = (field) => {
-    if (sortField !== field) return <span style={{ opacity: 0.25, marginLeft: 4, fontSize: '0.75rem' }}>↕</span>;
-    return <span style={{ color: "var(--primary-color)", marginLeft: 4, fontWeight: "bold", fontSize: '0.8rem' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>;
-  };
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      if (selectedStatuses.length > 0) {
+        const st = (order.status || "").toLowerCase();
+        const matchesAny = selectedStatuses.some(statusKey => {
+          if (statusKey === "zakonczone" && (st === "completed" || st.includes("zako"))) return true;
+          if (statusKey === "w_trakcie" && (st === "in_progress" || st.includes("trakcie"))) return true;
+          if (statusKey === "nowe" && (st === "new" || st.includes("now"))) return true;
+          if (statusKey === "wstrzymane" && (st === "on_hold" || st.includes("wstrzyma"))) return true;
+          return false;
+        });
+        if (!matchesAny) return false;
+      }
 
-  const filteredOrders = orders.filter(order => {
-    if (selectedStatuses.length > 0) {
-      const st = (order.status || "").toLowerCase();
-      const matchesAny = selectedStatuses.some(statusKey => {
-        if (statusKey === "zakonczone" && (st === "completed" || st.includes("zako"))) return true;
-        if (statusKey === "w_trakcie" && (st === "in_progress" || st.includes("trakcie"))) return true;
-        if (statusKey === "nowe" && (st === "new" || st.includes("now"))) return true;
-        if (statusKey === "wstrzymane" && (st === "on_hold" || st.includes("wstrzyma"))) return true;
-        return false;
-      });
-      if (!matchesAny) return false;
-    }
+      if (filterMonth) {
+        const dateStr = order.deadline || order.created_at;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return false;
+        const orderMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (orderMonthKey !== filterMonth) return false;
+      }
 
-    if (filterMonth) {
-      const dateStr = order.deadline || order.created_at;
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      const orderMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (orderMonthKey !== filterMonth) return false;
-    }
+      const search = searchText.toLowerCase();
+      const titleMatch = order.title?.toLowerCase().includes(search);
+      const clientName = getClientDisplayName(order).toLowerCase();
+      const clientMatch = clientName.includes(search);
 
-    const search = searchText.toLowerCase();
-    const titleMatch = order.title?.toLowerCase().includes(search);
-    const clientName = getClientDisplayName(order).toLowerCase();
-    const clientMatch = clientName.includes(search);
+      return !searchText || titleMatch || clientMatch;
+    });
+  }, [orders, selectedStatuses, filterMonth, searchText, getClientDisplayName]);
 
-    return !searchText || titleMatch || clientMatch;
-  });
+  const sortedOrders = useMemo(() => {
+    return [...filteredOrders].sort((a, b) => {
+      let aVal, bVal;
 
-  const sortedOrders = [...filteredOrders].sort((a, b) => {
-    let aVal, bVal;
+      switch (sortField) {
+        case 'id':
+          aVal = Number(a.id);
+          bVal = Number(b.id);
+          break;
+        case 'title':
+          aVal = (a.title || "").toLowerCase();
+          bVal = (b.title || "").toLowerCase();
+          break;
+        case 'client':
+          aVal = getClientDisplayName(a).toLowerCase();
+          bVal = getClientDisplayName(b).toLowerCase();
+          break;
+        case 'deadline':
+          aVal = a.deadline ? new Date(a.deadline).getTime() : 0;
+          bVal = b.deadline ? new Date(b.deadline).getTime() : 0;
+          break;
+        case 'price':
+          aVal = Number(a.price) || 0;
+          bVal = Number(b.price) || 0;
+          break;
+        case 'status':
+          aVal = (getStatusBadge(a.status).label || "").toLowerCase();
+          bVal = (getStatusBadge(b.status).label || "").toLowerCase();
+          break;
+        default:
+          aVal = Number(a.id);
+          bVal = Number(b.id);
+      }
 
-    switch (sortField) {
-      case 'id':
-        aVal = Number(a.id);
-        bVal = Number(b.id);
-        break;
-      case 'title':
-        aVal = (a.title || "").toLowerCase();
-        bVal = (b.title || "").toLowerCase();
-        break;
-      case 'client':
-        aVal = getClientDisplayName(a).toLowerCase();
-        bVal = getClientDisplayName(b).toLowerCase();
-        break;
-      case 'deadline':
-        aVal = a.deadline ? new Date(a.deadline).getTime() : 0;
-        bVal = b.deadline ? new Date(b.deadline).getTime() : 0;
-        break;
-      case 'price':
-        aVal = Number(a.price) || 0;
-        bVal = Number(b.price) || 0;
-        break;
-      case 'status':
-        aVal = (getStatusBadge(a.status).label || "").toLowerCase();
-        bVal = (getStatusBadge(b.status).label || "").toLowerCase();
-        break;
-      default:
-        aVal = Number(a.id);
-        bVal = Number(b.id);
-    }
-
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredOrders, sortField, sortDirection, getClientDisplayName]);
 
   return (
     <div className="orders-container">
@@ -537,22 +433,22 @@ export default function OrdersList() {
               <thead>
                 <tr>
                   <th style={{ width: "6%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("id")}>
-                    ID {renderSortIcon("id")}
+                    ID <SortIcon active={sortField === "id"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "25%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("title")}>
-                    Tytuł {renderSortIcon("title")}
+                    Tytuł <SortIcon active={sortField === "title"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "23%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("client")}>
-                    Klient {renderSortIcon("client")}
+                    Klient <SortIcon active={sortField === "client"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "13%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("deadline")}>
-                    Termin {renderSortIcon("deadline")}
+                    Termin <SortIcon active={sortField === "deadline"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "13%", textAlign: "right", paddingRight: "20px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("price")}>
-                    Cena {renderSortIcon("price")}
+                    Cena <SortIcon active={sortField === "price"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "12%", textAlign: "center", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("status")}>
-                    Status {renderSortIcon("status")}
+                    Status <SortIcon active={sortField === "status"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "8%", textAlign: "right", paddingRight: "20px" }}>Akcje</th>
                 </tr>
