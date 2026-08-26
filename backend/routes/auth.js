@@ -12,7 +12,11 @@ router.post("/login", asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Brak danych" });
 
-  const { rows } = await pool.query("SELECT * FROM users WHERE email = $1 AND is_active = true", [email]);
+  const inputStr = String(email).trim();
+  const { rows } = await pool.query(
+    "SELECT * FROM users WHERE (LOWER(email) = LOWER($1) OR LOWER(email) LIKE LOWER($1) || '@%') AND is_active = true",
+    [inputStr]
+  );
   const user = rows[0];
 
   const validPassword = user ? await bcrypt.compare(password, user.password_hash) : false;

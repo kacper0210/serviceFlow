@@ -71,16 +71,16 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="premium-form">
           <div className="form-group">
-            <label htmlFor="login-email">Adres e-mail</label>
+            <label htmlFor="login-email">Adres e-mail lub login</label>
             <input
               id="login-email"
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="nazwa@firma.pl"
+              placeholder="E-mail lub login (np. admin)"
               required
               className="premium-input"
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
 
