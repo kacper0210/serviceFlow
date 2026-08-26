@@ -625,6 +625,7 @@ export default function OrdersList() {
             <h3 style={{ marginTop: 0, textAlign: "center" }}>Nowe zlecenie</h3>
             <AddOrderForm onOrderAdded={(newOrder) => {
               setOrders(prev => [newOrder, ...prev]);
+              fetchData();
               setShowAddModal(false);
             }} />
           </div>

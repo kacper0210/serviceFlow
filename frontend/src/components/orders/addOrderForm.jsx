@@ -15,6 +15,11 @@ export default function AddOrderForm({ onOrderAdded }) {
   const [loading, setLoading] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
 
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
   const fetchClients = async () => {
     try {
       const authData = JSON.parse(localStorage.getItem("auth"));
@@ -108,7 +113,7 @@ export default function AddOrderForm({ onOrderAdded }) {
             hideHeader={true}
             onClientAdded={(newClient) => {
               setClients(prev => [...prev, newClient]);
-              setFormData(prev => ({ ...prev, client_id: newClient.id }));
+              setFormData(prev => ({ ...prev, client_id: String(newClient.id) }));
               setShowAddClient(false);
             }} 
           />

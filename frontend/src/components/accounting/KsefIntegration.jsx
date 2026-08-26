@@ -25,6 +25,21 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
 
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [retryCountdown, setRetryCountdown] = useState(0);
+
+  useEffect(() => {
+    if (retryCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [retryCountdown]);
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -149,6 +164,9 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
         setInvoices(data.invoices || []);
         if (data.last_sync_at) setLastSyncAt(data.last_sync_at);
         const count = data.invoices ? data.invoices.length : 0;
+        if (data.retry_after) {
+          setRetryCountdown(data.retry_after);
+        }
         if (data.warning) {
           setErrorMessage(data.warning);
         } else {
@@ -262,6 +280,16 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
     });
   };
 
+  const formatCountdown = (totalSeconds) => {
+    if (!totalSeconds || totalSeconds <= 0) return "";
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) return `${hours} godz. ${minutes} min`;
+    if (minutes > 0) return `${minutes} min ${seconds} s`;
+    return `${seconds} s`;
+  };
+
   const formatLastSync = (timestamp) => {
     if (!timestamp) return "Brak (nie przeprowadzono synchronizacji)";
     const date = new Date(timestamp);
@@ -287,7 +315,14 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
             <span style={{ fontSize: "1.1rem" }}>{errorMessage.includes("429") || errorMessage.includes("limit") || errorMessage.includes("bazy") ? "⏱️" : "⚠️"}</span>
-            <span>{errorMessage}</span>
+            <div>
+              <span>{errorMessage}</span>
+              {retryCountdown > 0 && (
+                <strong style={{ display: 'block', marginTop: '4px', color: '#b45309' }}>
+                  ⏳ Ponowne połączenie z serwerem MF będzie możliwe za: {formatCountdown(retryCountdown)}
+                </strong>
+              )}
+            </div>
           </div>
           <button
             type="button"
@@ -371,14 +406,18 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
               onClick={handleSyncKsef}
               className="btn-primary"
               style={{ padding: "8px 18px", fontSize: "0.85rem", borderRadius: "6px" }}
-              disabled={syncing}
+              disabled={syncing || retryCountdown > 0}
             >
               {syncing ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
                   <span className="spinner" style={{ width: "13px", height: "13px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}></span>
                   Synchronizacja...
                 </span>
-              ) : "Synchronizuj z KSeF"}
+              ) : retryCountdown > 0 ? (
+                `Odczekaj (${formatCountdown(retryCountdown)})`
+              ) : (
+                "🔄 Synchronizuj z KSeF"
+              )}
             </button>
 
             <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginLeft: "8px", borderLeft: "1px solid var(--border-color)", paddingLeft: "12px" }}>

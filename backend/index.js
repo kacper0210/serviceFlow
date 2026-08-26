@@ -132,6 +132,14 @@ async function ensureDbTablesExist() {
       ALTER TABLE offer_items ALTER COLUMN unit_price_net DROP NOT NULL;
 
       ALTER TABLE orders ALTER COLUMN client_id DROP NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS issues (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        status VARCHAR(50) DEFAULT 'open',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     console.log("[DB Migration] All required DB tables verified successfully!");
@@ -475,9 +483,17 @@ app.get("/api/orders", checkAuth, asyncHandler(async (req, res) => {
 
 app.get("/api/orders/:id", checkAuth, asyncHandler(async (req, res) => {
   const query = `
-    SELECT o.*, 
-    COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
+    SELECT 
+      o.*, 
+      c.type as client_type,
+      c.company_name,
+      c.first_name, 
+      c.last_name, 
+      c.email,
+      c.phone,
+      COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
     FROM orders o 
+    LEFT JOIN clients c ON o.client_id = c.id
     WHERE o.id = $1
   `;
   const { rows } = await pool.query(query, [req.params.id]);
@@ -569,9 +585,9 @@ app.post("/api/orders", checkAuth, asyncHandler(async (req, res) => {
       parsedPrice = parseFloat(price);
     }
 
-    const { rows } = await pool.query(
+    const { rows: insertedRows } = await pool.query(
       `INSERT INTO orders (title, description, status, price, notes, client_id, deadline)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [
         String(title).trim(),
         description || null,
@@ -582,6 +598,23 @@ app.post("/api/orders", checkAuth, asyncHandler(async (req, res) => {
         deadline || null
       ]
     );
+
+    const newOrderId = insertedRows[0].id;
+    const { rows } = await pool.query(`
+      SELECT 
+        o.*, 
+        c.type as client_type,
+        c.company_name,
+        c.first_name, 
+        c.last_name, 
+        c.email,
+        c.phone,
+        COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
+      FROM orders o 
+      LEFT JOIN clients c ON o.client_id = c.id 
+      WHERE o.id = $1
+    `, [newOrderId]);
+
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error("Error creating order:", err);
@@ -595,7 +628,23 @@ app.put("/api/orders/:id", checkAuth, asyncHandler(async (req, res) => {
 
   const updated = await dynamicUpdate("orders", req.params.id, req.body, allowed);
   if (!updated) return res.status(404).json({ error: "Nie zaktualizowano" });
-  res.json(updated);
+
+  const { rows } = await pool.query(`
+    SELECT 
+      o.*, 
+      c.type as client_type,
+      c.company_name,
+      c.first_name, 
+      c.last_name, 
+      c.email,
+      c.phone,
+      COALESCE((SELECT SUM(amount) FROM order_costs WHERE order_id = o.id), 0) as total_costs
+    FROM orders o 
+    LEFT JOIN clients c ON o.client_id = c.id 
+    WHERE o.id = $1
+  `, [req.params.id]);
+
+  res.json(rows[0]);
 }));
 
 app.delete("/api/orders/:id", checkAuth, asyncHandler(async (req, res) => {
@@ -1016,14 +1065,16 @@ app.post("/api/accounting/ksef/sync", checkAuth, asyncHandler(async (req, res) =
       [dateFrom, dateTo]
     );
 
-    const isRateLimit = err.message?.includes("429") || err.message?.includes("limit") || err.message?.includes("Rate Limit") || err.message?.includes("wymaga");
+    const retryAfter = err.retryAfter || 60;
+    const isRateLimit = err.status === 429 || err.message?.includes("429") || err.message?.includes("limit") || err.message?.includes("Rate Limit") || err.message?.includes("wymaga");
 
     return res.json({
       success: false,
       invoices: cachedRes.rows,
       last_sync_at: settings?.last_sync_at,
+      retry_after: isRateLimit ? retryAfter : null,
       warning: isRateLimit
-        ? `⏱️ Bramka KSeF nakłada limit zapytań (Rate Limit). Wyświetlono faktury z lokalnej bazy danych (${cachedRes.rows.length} szt.). Zsynchronizuje się po upływie podanego czasu.`
+        ? `⏱️ ${err.message || "Bramka KSeF (MF) nakłada limit zapytań."} Wyświetlono faktury z lokalnej bazy danych (${cachedRes.rows.length} szt.).`
         : `Błąd połączenia z KSeF (${err.message}). Wyświetlono faktury z lokalnej bazy.`
     });
   }
@@ -1388,7 +1439,50 @@ app.get("/api/accounting/stats", checkAuth, asyncHandler(async (req, res) => {
   });
 }));
 
+// ==========================================
+// --- ISSUES / BUGS & SUGGESTIONS API ---
+// ==========================================
 
+app.get("/api/issues", asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM issues ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END, created_at DESC"
+  );
+  res.json(result.rows);
+}));
+
+app.post("/api/issues", asyncHandler(async (req, res) => {
+  const { type, description } = req.body;
+  if (!description || !description.trim()) {
+    return res.status(400).json({ error: "Opis jest wymagany" });
+  }
+  const result = await pool.query(
+    "INSERT INTO issues (type, description, status) VALUES ($1, $2, 'open') RETURNING *",
+    [type || 'błąd', description.trim()]
+  );
+  res.status(201).json(result.rows[0]);
+}));
+
+app.patch("/api/issues/:id", asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const result = await pool.query(
+    "UPDATE issues SET status = $1 WHERE id = $2 RETURNING *",
+    [status || 'open', id]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Zgłoszenie nie istnieje" });
+  }
+  res.json(result.rows[0]);
+}));
+
+app.delete("/api/issues/:id", asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await pool.query("DELETE FROM issues WHERE id = $1 RETURNING *", [id]);
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Zgłoszenie nie istnieje" });
+  }
+  res.json({ message: "Usunięto pomyślnie", deleted: result.rows[0] });
+}));
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

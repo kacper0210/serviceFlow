@@ -11,6 +11,9 @@ import Settings from "./components/settings/Settings";
 import Users from "./components/users/Users";
 import Accounting from "./components/accounting/Accounting";
 import OffersList from "./components/offers/OffersList";
+import IssuesList from "./components/issues/IssuesList";
+import GlobalIssueModal from "./components/issues/GlobalIssueModal";
+import BottomNav from "./components/navigation/BottomNav";
 
 
 export default function App() {
@@ -48,6 +51,8 @@ export default function App() {
   return (
     <div className="app-layout">
       {auth && <Navbar user={auth.user} />}
+      {auth && <GlobalIssueModal />}
+      {auth && <BottomNav user={auth.user} />}
 
       <main className="app-content">
         <Routes>
@@ -59,6 +64,7 @@ export default function App() {
           <Route path="/offers" element={<PrivateRoute auth={auth}><OffersList /></PrivateRoute>} />
           <Route path="/calendar" element={<PrivateRoute auth={auth}><OrdersCalendar /></PrivateRoute>} />
           <Route path="/accounting" element={<PrivateRoute auth={auth}><Accounting /></PrivateRoute>} />
+          <Route path="/issues" element={<PrivateRoute auth={auth}><IssuesList /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute auth={auth}><Settings /></PrivateRoute>} />
 
 
@@ -113,6 +119,7 @@ function Navbar({ user }) {
         <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Kalendarz</NavLink>
         <NavLink to="/accounting" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Księgowość</NavLink>
         <NavLink to="/offers" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Oferty</NavLink>
+        <NavLink to="/issues" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Zgłoszenia</NavLink>
         {user.role === "admin" && (
           <NavLink to="/users" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Użytkownicy</NavLink>
         )}

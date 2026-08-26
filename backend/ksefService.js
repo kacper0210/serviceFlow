@@ -61,23 +61,26 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
     if (res.status === 429) {
       attempt++;
       const retryAfterHeader = res.headers.get('retry-after');
-      const waitSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 0;
+      let waitSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 3600;
       
-      // If KSeF requires waiting more than 8 seconds, fail fast with informative message instead of hanging the connection
-      if (waitSeconds > 8) {
-        const waitMinutes = Math.ceil(waitSeconds / 60);
-        throw new Error(`Przekroczono limit zapytań KSeF (błąd HTTP 429 Rate Limit). KSeF wymaga odczekania ok. ${waitMinutes} min przed kolejną synchronizacją.`);
-      }
+      let detailMsg = null;
+      try {
+        const text = await res.text();
+        const errJson = JSON.parse(text);
+        if (errJson?.status?.details?.[0]) {
+          detailMsg = errJson.status.details[0];
+          const match = detailMsg.match(/(\d+)\s*minut/i);
+          if (match) {
+            waitSeconds = parseInt(match[1], 10) * 60;
+          }
+        }
+      } catch (e) {}
 
-      if (attempt > maxRetries) {
-        const errText = await res.text();
-        throw new Error(`Przekroczono limit zapytań KSeF (Rate Limit 429 Exceeded): ${errText}`);
-      }
-      
-      const waitMs = waitSeconds > 0 ? Math.min(waitSeconds * 1000, 5000) : 2000 * Math.pow(2, attempt);
-      console.warn(`[KSeF Rate Limit 429] Waiting ${waitMs}ms before retry attempt ${attempt}/${maxRetries}...`);
-      await new Promise(resolve => setTimeout(resolve, waitMs));
-      continue;
+      const msg = detailMsg || `Przekroczono limit zapytań KSeF (błąd HTTP 429: max 20 żądań na godzinę). Odczekaj podany czas przed kolejną synchronizacją.`;
+      const err = new Error(msg);
+      err.retryAfter = waitSeconds;
+      err.status = 429;
+      throw err;
     }
     return res;
   }
@@ -367,7 +370,7 @@ async function authenticateKSeF(nip, token, env, pool = null) {
   const accessTokenVal = typeof sessionData.accessToken === 'object' ? sessionData.accessToken?.token : sessionData.accessToken || authTokenValue;
   const refreshTokenVal = typeof sessionData.refreshToken === 'object' ? sessionData.refreshToken?.token : sessionData.refreshToken || null;
   
-  const expiresAt = Date.now() + 14 * 60 * 1000;
+  const expiresAt = Date.now() + (11 * 60 * 60 * 1000); // Token valid for 11 hours
   const session = { accessToken: accessTokenVal, refreshToken: refreshTokenVal, expiresAt, nip, env };
   
   sessionCache.set(nip, session);
@@ -406,7 +409,7 @@ async function refreshKSeFToken(session, pool = null) {
   
   session.accessToken = nextAccessToken;
   session.refreshToken = nextRefreshToken || session.refreshToken;
-  session.expiresAt = Date.now() + 14 * 60 * 1000;
+  session.expiresAt = Date.now() + (11 * 60 * 60 * 1000);
   
   sessionCache.set(session.nip, session);
   if (pool) {
@@ -523,6 +526,10 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month) {
     let hasMore = true;
 
     for (const subjectType of ["Subject1", "Subject2"]) {
+      if (subjectType === "Subject2") {
+        // Pause 1.2s between query requests to prevent MF API burst Rate Limit
+        await new Promise(r => setTimeout(r, 1200));
+      }
       const isSales = subjectType === "Subject1";
       let pageOffset = 0;
       let hasMore = true;
