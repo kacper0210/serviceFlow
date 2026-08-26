@@ -48,30 +48,34 @@ export default function App() {
 
   if (loadingAuth) return null;
 
+  if (!auth) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    );
+  }
+
   return (
     <div className="app-layout">
-      {auth && <Navbar user={auth.user} />}
-      {auth && <GlobalIssueModal />}
-      {auth && <BottomNav user={auth.user} />}
+      <Navbar user={auth.user} />
+      <GlobalIssueModal />
+      <BottomNav user={auth.user} />
 
       <main className="app-content">
         <Routes>
-          <Route path="/login" element={!auth ? <Login /> : <Navigate to="/" />} />
-
-          <Route path="/" element={<PrivateRoute auth={auth}><Dashboard /></PrivateRoute>} />
-          <Route path="/clients" element={<PrivateRoute auth={auth}><ClientsList /></PrivateRoute>} />
-          <Route path="/orders" element={<PrivateRoute auth={auth}><OrdersList /></PrivateRoute>} />
-          <Route path="/offers" element={<PrivateRoute auth={auth}><OffersList /></PrivateRoute>} />
-          <Route path="/calendar" element={<PrivateRoute auth={auth}><OrdersCalendar /></PrivateRoute>} />
-          <Route path="/accounting" element={<PrivateRoute auth={auth}><Accounting /></PrivateRoute>} />
-          <Route path="/issues" element={<PrivateRoute auth={auth}><IssuesList /></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute auth={auth}><Settings /></PrivateRoute>} />
-
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/clients" element={<ClientsList />} />
+          <Route path="/orders" element={<OrdersList />} />
+          <Route path="/offers" element={<OffersList />} />
+          <Route path="/calendar" element={<OrdersCalendar />} />
+          <Route path="/accounting" element={<Accounting />} />
+          <Route path="/issues" element={<IssuesList />} />
+          <Route path="/settings" element={<Settings />} />
 
           <Route path="/users" element={
-            <PrivateRoute auth={auth}>
-              {auth?.user?.role === "admin" ? <Users /> : <Navigate to="/" />}
-            </PrivateRoute>
+            auth?.user?.role === "admin" ? <Users /> : <Navigate to="/" />
           } />
 
           <Route path="*" element={<Navigate to="/" />} />

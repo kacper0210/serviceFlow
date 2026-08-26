@@ -14,10 +14,10 @@ export default function Login() {
     if (localStorage.getItem("auth")) {
       navigate("/");
     }
-  }, []);
+  }, [navigate]);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setError("");
     setLoading(true);
 
@@ -31,13 +31,11 @@ export default function Login() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Błąd logowania");
+        throw new Error(result.error || "Nieprawidłowy e-mail lub hasło");
       }
 
       localStorage.setItem("auth", JSON.stringify(result));
-
       window.dispatchEvent(new Event("auth-changed"));
-
       navigate("/");
 
     } catch (err) {
@@ -48,46 +46,82 @@ export default function Login() {
     }
   };
 
+  const handleUseDemo = () => {
+    setEmail("admin@example.com");
+    setPassword("admin123");
+    setError("");
+  };
+
   return (
-    <div className="login-container">
-      <div className="login-box">
-        <h2 className="login-title">Logowanie do systemu</h2>
+    <div className="premium-login-container">
+      {/* Background Ambient Glow Orbs */}
+      <div className="ambient-glow glow-1" />
+      <div className="ambient-glow glow-2" />
 
-        {error && <div className="error-message">{error}</div>}
+      {/* Main Centered Glassmorphism Card */}
+      <div className="premium-login-card">
+        <div className="card-header">
+          <div className="brand-logo">
+            <span className="logo-icon-glow" />
+            <span className="brand-title">ServiceFlow</span>
+          </div>
+          <h1 className="card-title">Zaloguj się do konta</h1>
+          <p className="card-subtitle">Wpisz swoje dane, aby kontynuować pracę</p>
+        </div>
 
-        <form onSubmit={handleLogin}>
-          <div className="input-group">
-            <label>Email</label>
+        {error && (
+          <div className="premium-error-alert">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} className="premium-form">
+          <div className="form-group">
+            <label htmlFor="login-email">Adres e-mail</label>
             <input
-              type="text"
+              id="login-email"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="np. admin"
+              placeholder="nazwa@firma.pl"
               required
-              className="login-input"
+              className="premium-input"
+              autoComplete="email"
             />
           </div>
 
-          <div className="input-group">
-            <label>Hasło</label>
+          <div className="form-group">
+            <label htmlFor="login-password">Hasło</label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Hasło"
+              placeholder="••••••••"
               required
-              className="login-input"
+              className="premium-input"
+              autoComplete="current-password"
             />
           </div>
 
           <button
             type="submit"
-            className="login-btn"
-            disabled={loading}
+            className="premium-submit-btn"
+            disabled={loading || !email || !password}
           >
-            {loading ? "Logowanie..." : "Zaloguj się"}
+            {loading ? "Weryfikacja..." : "Zaloguj się"}
           </button>
         </form>
+
+        <div className="demo-footer">
+          <button
+            type="button"
+            className="demo-link-btn"
+            onClick={handleUseDemo}
+          >
+            Użyj danych testowych
+          </button>
+        </div>
       </div>
     </div>
   );

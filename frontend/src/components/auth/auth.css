@@ -1,99 +1,244 @@
-/* auth.css */
+/* auth.css - Premium Dark Glassmorphic Design (Linear/Vercel/Apple Inspired) */
 
-.login-container {
+.premium-login-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99999;
     display: flex;
-    justify-content: center;
     align-items: center;
-    min-height: 80vh;
-    /* Wyśrodkowanie w pionie */
-    padding: 20px;
+    justify-content: center;
+    width: 100vw;
+    height: 100vh;
+    background-color: #09090b;
+    padding: 24px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Geist", "Segoe UI", Roboto, sans-serif;
 }
 
-.login-box {
+/* Cinematic Ambient Mesh Glow Orbs */
+.ambient-glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+}
+
+.glow-1 {
+    width: 520px;
+    height: 520px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.12) 45%, transparent 70%);
+    filter: blur(100px);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -55%);
+    animation: pulseGlow 10s infinite alternate ease-in-out;
+}
+
+.glow-2 {
+    width: 380px;
+    height: 380px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.18) 0%, transparent 65%);
+    filter: blur(90px);
+    top: 15%;
+    right: 15%;
+    animation: pulseGlow 14s infinite alternate-reverse ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0% { transform: translate(-50%, -55%) scale(1); opacity: 0.8; }
+    100% { transform: translate(-48%, -50%) scale(1.12); opacity: 1; }
+}
+
+/* Glassmorphism Centered Login Card */
+.premium-login-card {
+    position: relative;
+    z-index: 10;
     width: 100%;
     max-width: 400px;
-    background: var(--card-bg);
-    color: var(--text-color);
-    padding: 40px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    background: rgba(18, 18, 22, 0.65);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 
+        0 30px 60px -12px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    padding: 38px 36px;
+    box-sizing: border-box;
 }
 
-.login-title {
-    text-align: center;
-    margin-top: 0;
-    margin-bottom: 25px;
-    color: var(--text-color);
+/* Header & Brand Logo */
+.card-header {
+    margin-bottom: 28px;
 }
 
-.input-group {
+.brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.logo-icon-glow {
+    width: 10px;
+    height: 10px;
+    background: #818cf8;
+    border-radius: 50%;
+    box-shadow: 0 0 12px #818cf8, 0 0 24px rgba(129, 140, 248, 0.8);
+}
+
+.brand-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: -0.03em;
+}
+
+.card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.03em;
+}
+
+.card-subtitle {
+    font-size: 13px;
+    color: #a1a1aa;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Error Alert */
+.premium-error-alert {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
     margin-bottom: 20px;
+    backdrop-filter: blur(8px);
+}
+
+/* Form Controls */
+.premium-form {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 18px;
 }
 
-.input-group label {
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.form-group label {
+    font-size: 13px;
     font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--muted-color);
+    color: #e4e4e7;
+    letter-spacing: -0.01em;
 }
 
-/* Inputy dostosowane do motywu */
-.login-input {
-    padding: 12px;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background-color: #ffffff !important;
-    /* Wymuszamy, chyba że wolisz ciemne */
-    color: #333 !important;
-    font-size: 16px;
-    transition: border-color 0.2s;
-}
-
-/* W trybie ciemnym, jeśli body ma klasę dark-mode (z Settings),
-   inputy mogą wyglądać lepiej, jeśli dostosujemy je tutaj,
-   ale dla bezpieczeństwa zostawiłem białe.
-   Jeśli chcesz ciemne inputy w loginie, usuń !important wyżej. */
-
-.login-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.login-btn {
+/* Form Inputs with WOW Focus Glow Effect */
+.premium-input {
     width: 100%;
-    padding: 12px;
-    background: var(--primary-color);
-    color: #fff;
+    height: 42px;
+    padding: 0 14px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 14px;
+    color: #f8fafc;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+}
+
+.premium-input::placeholder {
+    color: #52525b;
+}
+
+.premium-input:focus {
+    outline: none;
+    background: rgba(0, 0, 0, 0.5);
+    border-color: #818cf8;
+    box-shadow: 
+        0 0 0 3px rgba(129, 140, 248, 0.25),
+        0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+/* Submit Button with High Contrast & Micro-interactions */
+.premium-submit-btn {
+    width: 100%;
+    height: 42px;
+    background: #ffffff;
+    color: #09090b;
     border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 600;
-    margin-top: 10px;
-    transition: background 0.2s;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.login-btn:hover:not(:disabled) {
-    background: var(--primary-hover);
+.premium-submit-btn:hover:not(:disabled) {
+    background: #f4f4f5;
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 10px 25px -4px rgba(255, 255, 255, 0.25);
 }
 
-.login-btn:disabled {
-    opacity: 0.7;
+.premium-submit-btn:active:not(:disabled) {
+    transform: translateY(0) scale(0.99);
+}
+
+.premium-submit-btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
-    background: var(--muted-color);
+    box-shadow: none;
 }
 
-.error-message {
-    background: #fee2e2;
-    color: #991b1b;
-    padding: 12px;
-    border-radius: 6px;
-    margin-bottom: 20px;
+/* Discrete Demo Text Link */
+.demo-footer {
+    margin-top: 22px;
     text-align: center;
-    border: 1px solid #fecaca;
-    font-size: 0.9rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 18px;
+}
+
+.demo-link-btn {
+    background: none;
+    border: none;
+    color: #a1a1aa;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 2px 6px;
+    transition: color 0.15s ease;
+}
+
+.demo-link-btn:hover {
+    color: #f8fafc;
+    text-decoration: underline;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 480px) {
+    .premium-login-card {
+        padding: 28px 22px;
+        border-radius: 12px;
+    }
+
+    .card-title {
+        font-size: 20px;
+    }
 }

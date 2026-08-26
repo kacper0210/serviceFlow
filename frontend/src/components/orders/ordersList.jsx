@@ -57,6 +57,116 @@ export default function OrdersList() {
     }
   }, [location.search]);
 
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickLoading, setQuickLoading] = useState(false);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editOrder, setEditOrder] = useState(null);
+  const [detailsId, setDetailsId] = useState(null);
+
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set();
+    orders.forEach(order => {
+      const dateStr = order.deadline || order.created_at;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          monthsSet.add(key);
+        }
+      }
+    });
+
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    monthsSet.add(currentKey);
+
+    return Array.from(monthsSet).sort().reverse().map(key => {
+      const [year, month] = key.split('-');
+      const monthNames = [
+        "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+        "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+      ];
+      const label = `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+      return { key, label };
+    });
+  }, [orders]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const token = authData?.token;
+      const headers = { "Authorization": `Bearer ${token}` };
+
+      const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, { headers });
+      const ordersData = await ordersRes.json();
+
+      const clientsRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/clients`, { headers });
+      const clientsData = await clientsRes.json();
+
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setClients(Array.isArray(clientsData) ? clientsData : []);
+
+    } catch (err) {
+      console.error(err);
+      alert("Błąd pobierania danych");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleDelete = useCallback(async (id) => {
+    if (!window.confirm("Czy na pewno chcesz usunąć to zlecenie?")) return;
+
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${authData?.token}` }
+      });
+      setOrders(prev => prev.filter(o => o.id !== id));
+    } catch (err) {
+      alert("Nie udało się usunąć.");
+    }
+  }, []);
+
+  const handleQuickAddOrder = async (e) => {
+    e.preventDefault();
+    if (!quickTitle.trim()) return;
+
+    setQuickLoading(true);
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const token = authData?.token;
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: quickTitle.trim(),
+          status: "nowe"
+        })
+      });
+
+      if (res.ok) {
+        const newOrder = await res.json();
+        setOrders(prev => [newOrder, ...prev]);
+        setQuickTitle("");
+      }
+    } catch (err) {
+      console.error("Błąd szybkiego dodawania zlecenia:", err);
+    } finally {
+      setQuickLoading(false);
+    }
+  };
+
   const toggleStatusFilter = useCallback((statusKey) => {
     setSelectedStatuses(prev => {
       if (prev.includes(statusKey)) {

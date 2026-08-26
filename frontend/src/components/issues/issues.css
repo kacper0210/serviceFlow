@@ -370,3 +370,86 @@
   from { transform: translateY(10px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Dark Mode Enhancements for High Contrast UI */
+body.dark-mode .issue-modal-content {
+  background-color: #18181b;
+  color: #f8fafc;
+  border-color: #27272a;
+}
+
+body.dark-mode .issue-type-btn {
+  background: #27272a;
+  color: #f4f4f5;
+  border-color: #3f3f46;
+}
+
+body.dark-mode .issue-type-btn.active.bug {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+body.dark-mode .issue-type-btn.active.suggestion {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
+}
+
+body.dark-mode .issue-textarea {
+  background-color: #18181b !important;
+  color: #f8fafc !important;
+  border-color: #27272a !important;
+}
+
+body.dark-mode .issue-textarea::placeholder {
+  color: #71717a !important;
+}
+
+body.dark-mode .filter-btn {
+  background: #18181b;
+  color: #a1a1aa;
+  border-color: #27272a;
+}
+
+body.dark-mode .filter-btn.active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+body.dark-mode .issue-item {
+  background: #18181b;
+  border-color: #27272a;
+}
+
+body.dark-mode .issue-item.done {
+  background: #121215;
+  border-color: #27272a;
+  opacity: 0.85;
+}
+
+body.dark-mode .issue-item.done .issue-text {
+  color: #a1a1aa;
+  text-decoration: line-through;
+}
+
+body.dark-mode .issue-text {
+  color: #f8fafc;
+}
+
+body.dark-mode .issue-badge.błąd {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+body.dark-mode .issue-badge.sugestia {
+  background: rgba(14, 165, 233, 0.2);
+  color: #7dd3fc;
+}
+
+body.dark-mode .issues-empty {
+  background: #18181b;
+  border-color: #27272a;
+  color: #a1a1aa;
+}
