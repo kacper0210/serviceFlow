@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import EntriesList from "./EntriesList";
 import TaxDashboard from "./TaxDashboard";
 import KsefIntegration from "./KsefIntegration";

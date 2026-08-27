@@ -554,8 +554,8 @@ export default function OrdersList() {
                   <th style={{ width: "13%", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("deadline")}>
                     Termin <SortIcon active={sortField === "deadline"} direction={sortDirection} />
                   </th>
-                  <th style={{ width: "13%", textAlign: "right", paddingRight: "20px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("price")}>
-                    Cena <SortIcon active={sortField === "price"} direction={sortDirection} />
+                  <th style={{ width: "16%", textAlign: "right", paddingRight: "20px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("price")}>
+                    Wartość / Zarobek <SortIcon active={sortField === "price"} direction={sortDirection} />
                   </th>
                   <th style={{ width: "12%", textAlign: "center", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort("status")}>
                     Status <SortIcon active={sortField === "status"} direction={sortDirection} />
@@ -567,6 +567,9 @@ export default function OrdersList() {
                 {sortedOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => {
                   const clientName = getClientDisplayName(order);
                   const statusInfo = getStatusBadge(order.status);
+                  const priceNum = Number(order.price || 0);
+                  const costsNum = Number(order.total_costs || 0);
+                  const profitNum = priceNum - costsNum;
                   return (
                     <tr key={order.id}>
                       <td data-label="ID">#{order.id}</td>
@@ -577,8 +580,13 @@ export default function OrdersList() {
                       <td data-label="Termin" style={{ whiteSpace: "nowrap" }}>
                         {order.deadline ? new Date(order.deadline).toLocaleDateString() : "-"}
                       </td>
-                      <td data-label="Cena" className="text-right" style={{ whiteSpace: "nowrap", fontWeight: 600, textAlign: "right", paddingRight: "20px" }}>
-                        {order.price ? `${Number(order.price).toFixed(2)} zł` : "-"}
+                      <td data-label="Wartość / Zarobek" className="text-right" style={{ whiteSpace: "nowrap", textAlign: "right", paddingRight: "20px" }}>
+                        <div style={{ fontWeight: 600 }}>{priceNum > 0 ? `${priceNum.toFixed(2)} zł` : "-"}</div>
+                        {priceNum > 0 && (
+                          <div style={{ fontSize: '0.78rem', color: profitNum >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                            Zarobek: {profitNum.toFixed(2)} zł
+                          </div>
+                        )}
                       </td>
                       <td data-label="Status" style={{ textAlign: "center" }}>
                         <span className={`status-badge ${statusInfo.className}`}>

@@ -7,6 +7,13 @@ const router = express.Router();
 // GET /api/offers
 router.get("/", checkAuth, asyncHandler(async (req, res) => {
   try {
+    // Auto-expire offers whose validity date has passed
+    await pool.query(`
+      UPDATE offers 
+      SET status = 'expired' 
+      WHERE valid_until IS NOT NULL AND valid_until < CURRENT_DATE AND status IN ('sent', 'draft', 'pending')
+    `);
+
     const { status, search } = req.query;
     let conditions = ["1=1"];
     let params = [];

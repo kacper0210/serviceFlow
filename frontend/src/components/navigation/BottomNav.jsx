@@ -8,6 +8,7 @@ export default function BottomNav({ user }) {
     { to: "/clients", label: "Klienci", icon: "👤" },
     { to: "/calendar", label: "Kalendarz", icon: "📅" },
     { to: "/accounting", label: "Księgowość", icon: "📊" },
+    { to: "/finance", label: "Finanse", icon: "💳" },
     { to: "/offers", label: "Oferty", icon: "📄" },
     { to: "/issues", label: "Zgłoszenia", icon: "💬" },
   ];

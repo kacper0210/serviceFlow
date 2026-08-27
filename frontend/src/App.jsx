@@ -10,6 +10,7 @@ import Login from "./components/auth/Login";
 import Settings from "./components/settings/Settings";
 import Users from "./components/users/Users";
 import Accounting from "./components/accounting/Accounting";
+import Finance from "./components/finance/Finance";
 import OffersList from "./components/offers/OffersList";
 import IssuesList from "./components/issues/IssuesList";
 import GlobalIssueModal from "./components/issues/GlobalIssueModal";
@@ -37,13 +38,29 @@ export default function App() {
   useEffect(() => {
     checkAuth();
 
+    // Global fetch interceptor for 401/403 session expiry
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401 || response.status === 403) {
+        if (localStorage.getItem("auth")) {
+          localStorage.removeItem("auth");
+          window.dispatchEvent(new Event("auth-changed"));
+        }
+      }
+      return response;
+    };
+
     window.addEventListener("auth-changed", checkAuth);
 
     if (localStorage.getItem("theme") === "dark") {
       document.body.classList.add("dark-mode");
     }
 
-    return () => window.removeEventListener("auth-changed", checkAuth);
+    return () => {
+      window.fetch = originalFetch;
+      window.removeEventListener("auth-changed", checkAuth);
+    };
   }, []);
 
   if (loadingAuth) return null;
@@ -71,6 +88,7 @@ export default function App() {
           <Route path="/offers" element={<OffersList />} />
           <Route path="/calendar" element={<OrdersCalendar />} />
           <Route path="/accounting" element={<Accounting />} />
+          <Route path="/finance" element={<Finance />} />
           <Route path="/issues" element={<IssuesList />} />
           <Route path="/settings" element={<Settings />} />
 
@@ -122,6 +140,7 @@ function Navbar({ user }) {
         <NavLink to="/clients" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Klienci</NavLink>
         <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Kalendarz</NavLink>
         <NavLink to="/accounting" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Księgowość</NavLink>
+        <NavLink to="/finance" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Finanse</NavLink>
         <NavLink to="/offers" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Oferty</NavLink>
         <NavLink to="/issues" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Zgłoszenia</NavLink>
         {user.role === "admin" && (

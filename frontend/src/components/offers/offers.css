@@ -630,3 +630,103 @@ body.dark-mode .page {
     font-size: 0.85rem;
   }
 }
+
+/* =========================================================================
+   PRINT STYLING (A4 PRINT & PDF EXPORT FOR OFFERS)
+   ========================================================================= */
+@media print {
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11pt !important;
+  }
+
+  .navbar,
+  .app-header,
+  .sidebar,
+  .bottom-nav,
+  .global-issue-btn,
+  .no-print,
+  .modal-actions,
+  button,
+  .btn,
+  .offer-details-actions,
+  .debt-top-bar,
+  .segmented-nav-bar {
+    display: none !important;
+  }
+
+  .offer-modal-overlay,
+  .debt-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    box-shadow: none !important;
+  }
+
+  .offer-modal-content,
+  .debt-modal-box {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  .page {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  .page .summary {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+  }
+
+  .page .conditions-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+  }
+
+  .page table.cost-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    margin-top: 15px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .page table.cost-table th,
+  .page table.cost-table td {
+    display: table-cell !important;
+    padding: 8px 10px !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 10pt !important;
+  }
+
+  .page table.cost-table th {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: bold !important;
+  }
+
+  .page tr {
+    page-break-inside: avoid !important;
+  }
+}
