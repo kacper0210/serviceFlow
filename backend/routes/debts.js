@@ -403,11 +403,8 @@ router.get("/schedule/:debtId", asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
-// PUT /api/debts/schedule/item/:scheduleId/toggle-paid - Toggle paid status for schedule item & update debt balance
-router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, res) => {
-  const { scheduleId } = req.params;
+async function handleToggleScheduleItem(scheduleId, res) {
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
 
@@ -420,7 +417,6 @@ router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, re
     const item = schedRes.rows[0];
     const newPaidStatus = !item.is_paid;
 
-    // Fetch parent debt
     const debtRes = await client.query("SELECT * FROM debts WHERE id = $1 FOR UPDATE", [item.debt_id]);
     if (debtRes.rows.length === 0) {
       await client.query("ROLLBACK");
@@ -429,24 +425,38 @@ router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, re
 
     const debt = debtRes.rows[0];
     const capitalPart = parseAmount(item.capital_part);
+    const interestPart = parseAmount(item.interest_part);
 
     let newTotal = parseAmount(debt.total_amount);
     if (newPaidStatus) {
-      newTotal = parseAmount(item.remaining_balance); // Set total to exact remaining balance from schedule!
+      newTotal = Math.max(0, newTotal - capitalPart);
     } else {
       newTotal = newTotal + capitalPart;
     }
 
-    // Update schedule row status
     const updatedSched = await client.query(
       "UPDATE debt_schedules SET is_paid = $1, paid_at = $2 WHERE id = $3 RETURNING id, debt_id, installment_number, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at",
       [newPaidStatus, newPaidStatus ? new Date() : null, scheduleId]
     );
 
-    // Update parent debt balance
-    await client.query("UPDATE debts SET total_amount = $1, updated_at = NOW() WHERE id = $2", [newTotal, debt.id]);
+    const allSchedRes = await client.query(
+      "SELECT * FROM debt_schedules WHERE debt_id = $1 ORDER BY installment_number ASC",
+      [debt.id]
+    );
+    const currentMonthPrefix = new Date().toISOString().substring(0, 7);
+    const hasPaidInCurrentMonth = allSchedRes.rows.some(s => s.is_paid && s.due_date && new Date(s.due_date).toISOString().substring(0, 7) === currentMonthPrefix);
 
-    // Insert record into debt_payments log
+    await client.query(
+      `UPDATE debts 
+       SET total_amount = $1, 
+           is_paid_this_month = $2,
+           capital_installment = CASE WHEN $3 > 0 THEN $3 ELSE capital_installment END,
+           interest_installment = CASE WHEN $4 > 0 THEN $4 ELSE interest_installment END,
+           updated_at = NOW() 
+       WHERE id = $5`,
+      [newTotal, hasPaidInCurrentMonth, capitalPart, interestPart, debt.id]
+    );
+
     if (newPaidStatus) {
       await client.query(
         `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, is_paid, paid_at, notes)
@@ -456,9 +466,9 @@ router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, re
           debt.creditor,
           parseAmount(item.total_installment),
           capitalPart,
-          parseAmount(item.interest_part),
+          interestPart,
           item.due_date,
-          `Rata nr ${item.installment_number} odznaczona z harmonogramu spłat`
+          `Rata nr ${item.installment_number} odznaczona z harmonogramu spłat (spłata kapitału)`
         ]
       );
     }
@@ -474,6 +484,11 @@ router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, re
   } finally {
     client.release();
   }
+}
+
+// PUT /api/debts/schedule/item/:scheduleId/toggle-paid - Toggle paid status for schedule item & update debt balance
+router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, res) => {
+  await handleToggleScheduleItem(req.params.scheduleId, res);
 }));
 
 /* =========================================================================
@@ -553,9 +568,57 @@ router.put("/:id/toggle-monthly-paid", asyncHandler(async (req, res) => {
     const isCurrentlyPaid = Boolean(debt.is_paid_this_month);
     const newPaidStatus = !isCurrentlyPaid;
 
-    const capitalDelta = parseAmount(debt.capital_installment) > 0 
-      ? parseAmount(debt.capital_installment) 
-      : parseAmount(debt.monthly_installment);
+    const schedRes = await client.query(
+      "SELECT * FROM debt_schedules WHERE debt_id = $1 ORDER BY installment_number ASC FOR UPDATE",
+      [id]
+    );
+
+    let capitalDelta = 0;
+    let interestDelta = 0;
+
+    if (schedRes.rows.length > 0) {
+      if (newPaidStatus) {
+        const unpaidItem = schedRes.rows.find(s => !s.is_paid);
+        if (unpaidItem) {
+          capitalDelta = parseAmount(unpaidItem.capital_part);
+          interestDelta = parseAmount(unpaidItem.interest_part);
+          await client.query(
+            "UPDATE debt_schedules SET is_paid = true, paid_at = NOW() WHERE id = $1",
+            [unpaidItem.id]
+          );
+        } else {
+          capitalDelta = parseAmount(debt.capital_installment) > 0 ? parseAmount(debt.capital_installment) : parseAmount(debt.monthly_installment);
+          interestDelta = parseAmount(debt.interest_installment);
+        }
+      } else {
+        const paidItems = schedRes.rows.filter(s => s.is_paid);
+        const lastPaidItem = paidItems[paidItems.length - 1];
+        if (lastPaidItem) {
+          capitalDelta = parseAmount(lastPaidItem.capital_part);
+          interestDelta = parseAmount(lastPaidItem.interest_part);
+          await client.query(
+            "UPDATE debt_schedules SET is_paid = false, paid_at = NULL WHERE id = $1",
+            [lastPaidItem.id]
+          );
+        } else {
+          capitalDelta = parseAmount(debt.capital_installment) > 0 ? parseAmount(debt.capital_installment) : parseAmount(debt.monthly_installment);
+          interestDelta = parseAmount(debt.interest_installment);
+        }
+      }
+    } else {
+      const parsedMonthly = parseAmount(debt.monthly_installment);
+      const parsedInterest = parseAmount(debt.interest_installment);
+      const parsedCapital = parseAmount(debt.capital_installment);
+
+      if (parsedCapital > 0) {
+        capitalDelta = parsedCapital;
+      } else if (parsedMonthly > 0) {
+        capitalDelta = Math.max(0, parsedMonthly - parsedInterest);
+      } else {
+        capitalDelta = 0;
+      }
+      interestDelta = parsedInterest;
+    }
 
     let newTotal = parseAmount(debt.total_amount);
     if (newPaidStatus) {
@@ -568,10 +631,15 @@ router.put("/:id/toggle-monthly-paid", asyncHandler(async (req, res) => {
 
     const updatedRes = await client.query(
       `UPDATE debts 
-       SET total_amount = $1, is_paid_this_month = $2, last_paid_date = $3, updated_at = NOW()
+       SET total_amount = $1, 
+           is_paid_this_month = $2, 
+           capital_installment = CASE WHEN $5 > 0 THEN $5 ELSE capital_installment END,
+           interest_installment = CASE WHEN $6 > 0 THEN $6 ELSE interest_installment END,
+           last_paid_date = $3, 
+           updated_at = NOW()
        WHERE id = $4
        RETURNING *`,
-      [newTotal, newPaidStatus, newPaidStatus ? todayStr : null, id]
+      [newTotal, newPaidStatus, newPaidStatus ? todayStr : null, id, capitalDelta, interestDelta]
     );
 
     // Record/Update debt_payments entry without creating duplicates
@@ -587,18 +655,18 @@ router.put("/:id/toggle-monthly-paid", asyncHandler(async (req, res) => {
       if (existingPayment.rows.length > 0) {
         await client.query(
           "UPDATE debt_payments SET is_paid = true, paid_at = NOW(), amount = $1, capital_amount = $2, interest_amount = $3 WHERE id = $4",
-          [parseAmount(debt.monthly_installment), capitalDelta, parseAmount(debt.interest_installment), existingPayment.rows[0].id]
+          [parseAmount(debt.monthly_installment), capitalDelta, interestDelta, existingPayment.rows[0].id]
         );
       } else {
         await client.query(
           `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, is_paid, paid_at, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), 'Rata miesięczna odznaczona w wykazie')`,
+           VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), 'Rata miesięczna odznaczona w wykazie (spłata kapitału)')`,
           [
             debt.id,
             debt.creditor,
             parseAmount(debt.monthly_installment),
             capitalDelta,
-            parseAmount(debt.interest_installment),
+            interestDelta,
             todayStr
           ]
         );
@@ -686,19 +754,7 @@ router.get("/:id/schedule", asyncHandler(async (req, res) => {
 
 // PUT /api/debts/schedule/:scheduleId/toggle-paid
 router.put("/schedule/:scheduleId/toggle-paid", asyncHandler(async (req, res) => {
-  const { scheduleId } = req.params;
-  const { rows: schedRows } = await pool.query("SELECT * FROM debt_schedules WHERE id = $1", [scheduleId]);
-  if (schedRows.length === 0) return res.status(404).json({ error: "Brak raty w harmonogramie" });
-
-  const currentItem = schedRows[0];
-  const newPaidStatus = !currentItem.is_paid;
-
-  const { rows } = await pool.query(
-    "UPDATE debt_schedules SET is_paid = $1 WHERE id = $2 RETURNING *",
-    [newPaidStatus, scheduleId]
-  );
-
-  res.json(rows[0]);
+  await handleToggleScheduleItem(req.params.scheduleId, res);
 }));
 
 module.exports = router;
