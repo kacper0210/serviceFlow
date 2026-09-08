@@ -841,3 +841,109 @@ body.dark-mode .ksef-alert.success {
   color: #16a34a;
 }
 
+/* Invoices Module Styling */
+.invoices-list-container {
+  animation: fadeIn 0.25s ease-out;
+}
+
+.invoices-stat-card {
+  background: linear-gradient(135deg, #00703C 0%, #004d29 100%);
+  color: #ffffff;
+  padding: 16px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 112, 60, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.invoices-stat-card label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.invoices-stat-card .stat-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.invoices-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.invoices-table-card table {
+  width: 100%;
+  margin: 0;
+}
+
+.invoices-table-card th {
+  background: var(--bg-subtle, #f8fafc);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+body.dark-mode .invoices-table-card th {
+  background: rgba(255, 255, 255, 0.05);
+  color: #9ca3af;
+}
+
+.invoices-table-card td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.invoices-table-card tr:last-child td {
+  border-bottom: none;
+}
+
+.inv-no-badge {
+  font-weight: 700;
+  color: #00703C;
+  font-family: monospace;
+  font-size: 0.95rem;
+}
+
+body.dark-mode .inv-no-badge {
+  color: #34d399;
+}
+
+.invoice-form-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.invoice-form-card label {
+  color: var(--text-main);
+}
+
+.invoice-form-card input,
+.invoice-form-card select,
+.invoice-form-card textarea {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.invoice-form-card input:focus,
+.invoice-form-card select:focus,
+.invoice-form-card textarea:focus {
+  border-color: #00703C;
+  box-shadow: 0 0 0 3px rgba(0, 112, 60, 0.15);
+}
+
+

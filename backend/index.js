@@ -15,6 +15,7 @@ const offersRoutes = require("./routes/offers");
 const accountingRoutes = require("./routes/accounting");
 const issuesRoutes = require("./routes/issues");
 const debtsRoutes = require("./routes/debts");
+const invoicesRoutes = require("./routes/invoices");
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use("/api/offers", offersRoutes);
 app.use("/api/accounting", accountingRoutes);
 app.use("/api/issues", issuesRoutes);
 app.use("/api/debts", debtsRoutes);
+app.use("/api/invoices", invoicesRoutes);
 
 // Global Error Handler Middleware
 app.use((err, req, res, next) => {

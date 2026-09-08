@@ -186,6 +186,19 @@ async function ensureDbTablesExist() {
       ALTER TABLE fixed_expenses ADD COLUMN IF NOT EXISTS is_paid_this_month BOOLEAN DEFAULT FALSE;
       ALTER TABLE fixed_expenses ADD COLUMN IF NOT EXISTS last_paid_date DATE;
 
+      CREATE TABLE IF NOT EXISTS fixed_incomes (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        due_day INTEGER DEFAULT 1,
+        category VARCHAR(100) DEFAULT 'Stały przychód',
+        is_active BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_fixed_incomes_active ON fixed_incomes(is_active);
+
       CREATE TABLE IF NOT EXISTS pending_bills (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -213,6 +226,77 @@ async function ensureDbTablesExist() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS seller_settings (
+        id SERIAL PRIMARY KEY,
+        company_name VARCHAR(255) DEFAULT 'KMTechFix Kacper Wójcik',
+        address_line1 VARCHAR(255) DEFAULT 'ul. Koszalińska 12 / 1',
+        address_line2 VARCHAR(255) DEFAULT '78-230 Karlino',
+        nip VARCHAR(50) DEFAULT '6722109643',
+        bank_account VARCHAR(100) DEFAULT '83 1140 2004 0000 3302 8526 9999',
+        logo_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        invoice_number VARCHAR(100) UNIQUE NOT NULL,
+        issue_date DATE NOT NULL,
+        sale_date DATE NOT NULL,
+        payment_deadline DATE NOT NULL,
+        payment_method VARCHAR(50) DEFAULT 'przelew',
+        bank_account VARCHAR(100),
+        seller_name VARCHAR(255),
+        seller_nip VARCHAR(50),
+        seller_address TEXT,
+        buyer_name VARCHAR(255) NOT NULL,
+        buyer_nip VARCHAR(50),
+        buyer_address TEXT,
+        buyer_id INT REFERENCES clients(id) ON DELETE SET NULL,
+        order_id INT REFERENCES orders(id) ON DELETE SET NULL,
+        offer_id INT REFERENCES offers(id) ON DELETE SET NULL,
+        status VARCHAR(50) DEFAULT 'issued',
+        notes TEXT,
+        ksef_reference_number VARCHAR(100),
+        ksef_qr_url TEXT,
+        total_net NUMERIC(12, 2) DEFAULT 0.00,
+        total_vat NUMERIC(12, 2) DEFAULT 0.00,
+        total_gross NUMERIC(12, 2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_items (
+        id SERIAL PRIMARY KEY,
+        invoice_id INT REFERENCES invoices(id) ON DELETE CASCADE,
+        lp INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        quantity NUMERIC(10, 2) DEFAULT 1.00,
+        unit VARCHAR(20) DEFAULT 'szt.',
+        unit_price_net NUMERIC(12, 2) DEFAULT 0.00,
+        vat_rate INTEGER DEFAULT 23,
+        net_amount NUMERIC(12, 2) DEFAULT 0.00,
+        vat_amount NUMERIC(12, 2) DEFAULT 0.00,
+        gross_amount NUMERIC(12, 2) DEFAULT 0.00
+      );
+
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS buyer_street VARCHAR(255);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS buyer_house_no VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS buyer_apt_no VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS buyer_postal_code VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS buyer_city VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS split_payment BOOLEAN DEFAULT FALSE;
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaction_description VARCHAR(255);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS document_type VARCHAR(50) DEFAULT 'faktura_vat';
+
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS street VARCHAR(255);
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS house_no VARCHAR(50);
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS apt_no VARCHAR(50);
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS postal_code VARCHAR(50);
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS city VARCHAR(100);
+
+      ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5, 2) DEFAULT 0.00;
+
       -- Performance Optimization: B-Tree Indexes
       CREATE INDEX IF NOT EXISTS idx_ksef_invoices_date ON ksef_invoices(date DESC);
       CREATE INDEX IF NOT EXISTS idx_accounting_entries_date_type ON accounting_entries(date DESC, entry_type);
@@ -226,7 +310,18 @@ async function ensureDbTablesExist() {
       CREATE INDEX IF NOT EXISTS idx_fixed_expenses_active ON fixed_expenses(is_active);
       CREATE INDEX IF NOT EXISTS idx_pending_bills_due ON pending_bills(due_date DESC, is_paid);
       CREATE INDEX IF NOT EXISTS idx_debt_schedules_debt ON debt_schedules(debt_id, installment_number);
+      CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON invoices(issue_date DESC);
     `);
+
+    // Ensure default seller settings exist
+    const sellerCheck = await pool.query("SELECT COUNT(*) FROM seller_settings");
+    if (parseInt(sellerCheck.rows[0].count, 10) === 0) {
+      await pool.query(`
+        INSERT INTO seller_settings (company_name, address_line1, address_line2, nip, bank_account)
+        VALUES ('KMTechFix Kacper Wójcik', 'ul. Koszalińska 12 / 1', '78-230 Karlino', '6722109643', '83 1140 2004 0000 3302 8526 9999')
+      `);
+      console.log("[DB Migration] Seeded default KMTechFix seller settings.");
+    }
 
     console.log("[DB Migration] All required DB tables and B-Tree indexes verified successfully!");
 

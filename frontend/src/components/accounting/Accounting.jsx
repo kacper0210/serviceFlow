@@ -3,17 +3,24 @@ import EntriesList from "./EntriesList";
 import TaxDashboard from "./TaxDashboard";
 import KsefIntegration from "./KsefIntegration";
 import TaxInfo from "./TaxInfo";
+import InvoicesList from "./InvoicesList";
 
 import "./accounting.css";
 
 export default function Accounting() {
-  const [activeTab, setActiveTab] = useState("taxes");
+  const [activeTab, setActiveTab] = useState("invoices");
 
   return (
     <div className="accounting-container">
       <div className="accounting-header">
         <h1 className="accounting-title">Ewidencja Księgowa</h1>
         <div className="accounting-tabs">
+          <button 
+            className={`tab-btn ${activeTab === "invoices" ? "active" : ""}`}
+            onClick={() => setActiveTab("invoices")}
+          >
+            Faktury Sprzedaży
+          </button>
           <button 
             className={`tab-btn ${activeTab === "taxes" ? "active" : ""}`}
             onClick={() => setActiveTab("taxes")}
@@ -48,6 +55,7 @@ export default function Accounting() {
       </div>
 
       <div className="accounting-content">
+        {activeTab === "invoices" && <InvoicesList />}
         {activeTab === "taxes" && <TaxDashboard />}
         {activeTab === "revenue" && <EntriesList type="revenue" />}
         {activeTab === "expenses" && <EntriesList type="expense" />}

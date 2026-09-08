@@ -1,0 +1,410 @@
+/* Szablon Faktury mOrganizer Finansów - Exact Single Page A4 Fit */
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
+
+.invoice-template {
+  width: 210mm;
+  height: 295mm;
+  padding: 10mm 14mm;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #2e3032;
+  font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
+  font-size: 10px;
+  line-height: 1.35;
+  box-sizing: border-box;
+  position: relative;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Header Top */
+.inv-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.inv-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inv-brand img {
+  max-height: 55px;
+  max-width: 220px;
+  object-fit: contain;
+}
+
+.inv-dates-container {
+  display: flex;
+  gap: 20px;
+}
+
+.inv-date-item {
+  border-left: 2px solid #00703C;
+  padding-left: 8px;
+}
+
+.inv-date-lbl {
+  font-size: 8.5px;
+  color: #7a7a7a;
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.inv-date-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Invoice Title on Top Right */
+.inv-title-box {
+  text-align: right;
+  margin-top: 5px;
+  margin-bottom: 16px;
+}
+
+.inv-title-text {
+  font-size: 19px;
+  font-weight: 800;
+  color: #00703C;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+/* Parties Columns (Wystawca & Nabywca) */
+.inv-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 16px;
+}
+
+.inv-party-column h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4b5563;
+  margin: 0 0 6px 0;
+}
+
+.inv-party-company {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+
+.inv-party-address {
+  color: #6b7280;
+  font-size: 10px;
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.inv-party-nip {
+  font-size: 10px;
+  font-weight: 700;
+  color: #374151;
+  margin-top: 2px;
+}
+
+/* Table of Items */
+.inv-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.inv-items-table th {
+  background-color: #cce6d5;
+  color: #1a3c27;
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 5px 6px;
+  text-align: right;
+  border-bottom: 1px solid #b7dbbf;
+}
+
+.inv-items-table th:first-child,
+.inv-items-table th:nth-child(2) {
+  text-align: left;
+}
+
+.inv-items-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: right;
+  font-size: 9.5px;
+  color: #1f2937;
+}
+
+.inv-items-table td:first-child,
+.inv-items-table td:nth-child(2) {
+  text-align: left;
+}
+
+.inv-items-table .col-lp { width: 28px; }
+.inv-items-table .col-pos { width: auto; }
+.inv-items-table .col-num { width: 64px; }
+.inv-items-table .col-unit { width: 34px; }
+.inv-items-table .col-vat { width: 42px; }
+
+/* Totals & VAT Summary Breakdown */
+.inv-totals-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.inv-totals-table {
+  width: 60%;
+  border-collapse: collapse;
+}
+
+.inv-totals-table td {
+  padding: 4px 6px;
+  text-align: right;
+  font-size: 9.5px;
+  color: #1f2937;
+}
+
+.inv-totals-table .row-razem td {
+  font-weight: 700;
+  border-top: 1px solid #d1d5db;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.inv-totals-table .vat-label {
+  text-align: left;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+/* Bottom Payment Section */
+.inv-bottom-grid {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+  margin-bottom: 14px;
+}
+
+.inv-payment-container {
+  width: 320px;
+}
+
+.inv-due-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4px;
+  border-bottom: 1.5px solid #00703C;
+  margin-bottom: 8px;
+}
+
+.inv-due-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #00703C;
+}
+
+.inv-due-amount {
+  font-size: 14px;
+  font-weight: 800;
+  color: #00703C;
+}
+
+.inv-pay-row {
+  display: flex;
+  margin-bottom: 4px;
+  font-size: 9.5px;
+}
+
+.inv-pay-key {
+  width: 100px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.inv-pay-val {
+  flex: 1;
+  color: #111827;
+  font-weight: 600;
+}
+
+.inv-pay-val.slownie-val {
+  font-weight: 500;
+  color: #374151;
+}
+
+.inv-bank-number {
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
+/* Remarks / Uwagi Section */
+.inv-notes-box {
+  margin-bottom: 14px;
+  padding: 6px 10px;
+  background: #f9fafb;
+  border-left: 3px solid #00703C;
+  border-radius: 2px;
+}
+
+.inv-notes-title {
+  font-weight: 700;
+  font-size: 9px;
+  color: #374151;
+  margin-bottom: 2px;
+}
+
+.inv-notes-content {
+  font-size: 9px;
+  color: #4b5563;
+  white-space: pre-line;
+}
+
+/* Footer Bottom */
+.inv-page-footer {
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.inv-footer-hr {
+  height: 1.5px;
+  background-color: #00703C;
+  margin-bottom: 6px;
+  border: none;
+}
+
+.inv-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8px;
+  color: #6b7280;
+}
+
+/* Modal Actions Header Overlay */
+.invoice-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px 10px;
+  overflow-y: auto;
+}
+
+.invoice-modal-actions {
+  position: fixed;
+  top: 15px;
+  right: 25px;
+  display: flex;
+  gap: 10px;
+  z-index: 10000;
+}
+
+.inv-btn-print {
+  background: #00703C;
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 112, 60, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.inv-btn-print:hover {
+  background: #005a30;
+  transform: translateY(-1px);
+}
+
+.inv-btn-close {
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.inv-btn-close:hover {
+  background: #f3f4f6;
+}
+
+/* Print Rules - Guaranteed 1-Page A4 Fit */
+@media print {
+  html, body {
+    height: 297mm !important;
+    max-height: 297mm !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  .invoice-modal-overlay {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 297mm !important;
+    background: none !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    backdrop-filter: none !important;
+  }
+  .invoice-template, .invoice-template * {
+    visibility: visible !important;
+  }
+  .invoice-template {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    padding: 8mm 12mm !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+  .invoice-modal-actions {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}

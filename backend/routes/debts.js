@@ -31,6 +31,88 @@ async function recordAutoSnapshot(clientOrPool) {
   }
 }
 
+// Helper to auto-reset monthly paid statuses and generate upcoming month's installment payments
+async function ensureMonthlyInstallmentsAndResets(clientOrPool) {
+  try {
+    const today = new Date();
+    const currentMonthStr = today.toISOString().substring(0, 7); // 'YYYY-MM'
+    const [yearStr, monthStr] = currentMonthStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10); // 1-12
+
+    // 1. Reset is_paid_this_month for debts and fixed_expenses if last_paid_date is from a previous month
+    await clientOrPool.query(`
+      UPDATE debts
+      SET is_paid_this_month = FALSE
+      WHERE is_paid_this_month = TRUE
+        AND (last_paid_date IS NULL OR TO_CHAR(last_paid_date, 'YYYY-MM') < $1)
+    `, [currentMonthStr]);
+
+    await clientOrPool.query(`
+      UPDATE fixed_expenses
+      SET is_paid_this_month = FALSE
+      WHERE is_paid_this_month = TRUE
+        AND (last_paid_date IS NULL OR TO_CHAR(last_paid_date, 'YYYY-MM') < $1)
+    `, [currentMonthStr]);
+
+    // 2. Auto-generate monthly installment entries in debt_payments for all active debts
+    const debtsRes = await clientOrPool.query(
+      "SELECT id, creditor, total_amount, monthly_installment, capital_installment, interest_installment, due_day FROM debts WHERE monthly_installment > 0 AND total_amount > 0"
+    );
+
+    for (const debt of debtsRes.rows) {
+      const existingPay = await clientOrPool.query(
+        `SELECT id FROM debt_payments 
+         WHERE (debt_id = $1 OR LOWER(creditor) = LOWER($2)) 
+           AND TO_CHAR(due_date, 'YYYY-MM') = $3 
+         LIMIT 1`,
+        [debt.id, debt.creditor, currentMonthStr]
+      );
+
+      if (existingPay.rows.length === 0) {
+        let dueDay = parseInt(debt.due_day, 10);
+        if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) dueDay = 10;
+
+        const maxDays = new Date(year, month, 0).getDate();
+        const actualDay = Math.min(dueDay, maxDays);
+        const dueDateStr = `${currentMonthStr}-${String(actualDay).padStart(2, '0')}`;
+
+        // Check if schedule entry exists for current month
+        const schedRes = await clientOrPool.query(
+          `SELECT * FROM debt_schedules 
+           WHERE debt_id = $1 
+             AND TO_CHAR(due_date, 'YYYY-MM') = $2 
+           LIMIT 1`,
+          [debt.id, currentMonthStr]
+        );
+
+        let amount = parseAmount(debt.monthly_installment);
+        let capAmount = parseAmount(debt.capital_installment) || amount;
+        let intAmount = parseAmount(debt.interest_installment) || 0;
+        let isPaid = false;
+        let notes = 'Automatyczna rata miesięczna';
+
+        if (schedRes.rows.length > 0) {
+          const s = schedRes.rows[0];
+          amount = parseAmount(s.total_installment);
+          capAmount = parseAmount(s.capital_part);
+          intAmount = parseAmount(s.interest_part);
+          isPaid = Boolean(s.is_paid);
+          notes = `Rata nr ${s.installment_number} z harmonogramu spłat`;
+        }
+
+        await clientOrPool.query(
+          `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, is_paid, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [debt.id, debt.creditor, amount, capAmount, intAmount, dueDateStr, isPaid, notes]
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[Auto-Monthly-Installment Reset Error]", err);
+  }
+}
+
 /* =========================================================================
    1. STATIC ROUTES (MUST BE BEFORE PARAMS /:id TO PREVENT ROUTE AMBIGUITY)
    ========================================================================= */
@@ -94,8 +176,9 @@ router.delete("/snapshots/:id", asyncHandler(async (req, res) => {
 
 // GET /api/debts/payments - Fetch due payments list
 router.get("/payments", asyncHandler(async (req, res) => {
+  await ensureMonthlyInstallmentsAndResets(pool);
   const { rows } = await pool.query(
-    "SELECT id, debt_id, creditor, amount, capital_amount, interest_amount, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, is_paid, paid_at, notes FROM debt_payments ORDER BY due_date ASC, is_paid ASC"
+    "SELECT id, debt_id, creditor, amount, capital_amount, interest_amount, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, is_paid, paid_at, notes FROM debt_payments ORDER BY is_paid ASC, due_date ASC"
   );
   res.json(rows);
 }));
@@ -191,6 +274,7 @@ router.put("/payments/:paymentId/toggle-paid", asyncHandler(async (req, res) => 
 
 // GET /api/debts/fixed-expenses
 router.get("/fixed-expenses", asyncHandler(async (req, res) => {
+  await ensureMonthlyInstallmentsAndResets(pool);
   const { rows } = await pool.query("SELECT * FROM fixed_expenses ORDER BY due_day ASC, name ASC");
   const total = rows.filter(r => r.is_active).reduce((sum, r) => sum + parseAmount(r.amount), 0);
   res.json({ expenses: rows, total_monthly: total });
@@ -497,6 +581,7 @@ router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, re
 
 // GET /api/debts - Fetch list of debts and calculate aggregate sums
 router.get("/", asyncHandler(async (req, res) => {
+  await ensureMonthlyInstallmentsAndResets(pool);
   const debtsRes = await pool.query(`
     SELECT d.*,
       COALESCE((SELECT COUNT(*) FROM debt_schedules ds WHERE ds.debt_id = d.id), 0)::int as total_schedule_count,

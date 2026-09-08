@@ -338,75 +338,8 @@ body.dark-mode .page {
 }
 .page .validity-note { font-size: 11.5px; color: #6b7280; font-weight: 500; }
 
-@page { size: A4; margin: 10mm 12mm; }
-@media print {
-  /* Hide non-printable navigation, sidebar, tables, and controls */
-  header, nav, aside, .navbar, .sidebar, .topbar, .header-actions-row, .table-container, .pagination-row, .no-print {
-    display: none !important;
-  }
-
-  /* Reset outer layout containers so children remain visible */
-  html, body, #root, .app-layout, .app-content, .offers-container {
-    background: #ffffff !important;
-    color: #1a1a1a !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: auto !important;
-    overflow: visible !important;
-    display: block !important;
-    position: static !important;
-  }
-
-  /* Position modal & document container for A4 printing */
-  .modal-overlay {
-    position: static !important;
-    background: #ffffff !important;
-    backdrop-filter: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    display: block !important;
-    overflow: visible !important;
-    z-index: auto !important;
-  }
-
-  .modal-content {
-    position: static !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    display: block !important;
-    overflow: visible !important;
-  }
-
-  .page {
-    display: block !important;
-    visibility: visible !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-    color: #1a1a1a !important;
-  }
-
-  .page * {
-    visibility: visible !important;
-  }
-}
-
 /* Mobile Responsive Styling for Offers Module */
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
   .offers-container {
     padding: 0;
   }
@@ -527,7 +460,7 @@ body.dark-mode .page {
     justify-content: flex-end;
   }
 
-  /* Cost Table inside Modal on Mobile */
+  /* Cost Table inside Modal on Mobile screen */
   .page {
     padding: 20px 16px !important;
   }
@@ -634,99 +567,196 @@ body.dark-mode .page {
 /* =========================================================================
    PRINT STYLING (A4 PRINT & PDF EXPORT FOR OFFERS)
    ========================================================================= */
-@media print {
-  body, html {
-    background: #ffffff !important;
-    color: #000000 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    font-size: 11pt !important;
-  }
+@page { 
+  size: A4 portrait; 
+  margin: 6mm 8mm; 
+}
 
-  .navbar,
-  .app-header,
-  .sidebar,
-  .bottom-nav,
-  .global-issue-btn,
-  .no-print,
-  .modal-actions,
-  button,
-  .btn,
-  .offer-details-actions,
-  .debt-top-bar,
-  .segmented-nav-bar {
+@media print {
+  /* Hide non-printable navigation, sidebar, headers, and UI controls */
+  header, nav, aside, .navbar, .sidebar, .topbar, .app-header, .bottom-nav,
+  .header-actions-row, .table-container, .pagination-row, .no-print,
+  .global-issue-btn, .modal-actions, button, .btn, .offer-details-actions,
+  .debt-top-bar, .segmented-nav-bar {
     display: none !important;
   }
 
-  .offer-modal-overlay,
-  .debt-modal-overlay {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
+  /* Reset outer layout containers so document prints cleanly */
+  html, body, #root, .app-layout, .app-content, .offers-container {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
     margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
     display: block !important;
+    position: static !important;
+  }
+
+  /* Modal reset for print */
+  .modal-overlay, .offer-modal-overlay, .debt-modal-overlay {
+    position: static !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    z-index: auto !important;
     box-shadow: none !important;
   }
 
-  .offer-modal-content,
-  .debt-modal-box {
+  .modal-content, .offer-modal-content, .debt-modal-box {
     position: static !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* Page document reset for print */
+  .page {
+    display: block !important;
+    visibility: visible !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    box-shadow: none !important;
     border: none !important;
+    box-shadow: none !important;
     background: #ffffff !important;
+    color: #1a1a1a !important;
+    font-size: 10pt !important;
   }
 
-  .page {
+  .page * {
+    visibility: visible !important;
+  }
+
+  .page .header {
+    margin-bottom: 16px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .page .doc-title {
+    margin-bottom: 14px !important;
+  }
+
+  .page .section {
+    margin-bottom: 14px !important;
+  }
+
+  .page .section-title {
+    font-size: 8.5pt !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 3px !important;
+  }
+
+  /* Cost Table Print Fixes */
+  .page table.cost-table {
+    display: table !important;
     width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 10mm !important;
-    box-shadow: none !important;
-    border: none !important;
-    background: #ffffff !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    margin-top: 8px !important;
+    margin-bottom: 12px !important;
+    font-size: 8.5pt !important;
   }
 
+  .page table.cost-table th {
+    display: table-cell !important;
+    background: #f8fafc !important;
+    color: #334155 !important;
+    font-weight: 700 !important;
+    font-size: 7.5pt !important;
+    padding: 5px 3px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-bottom: 2px solid #64748b !important;
+    text-align: right !important;
+    vertical-align: middle !important;
+    word-break: normal !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
+  }
+
+  .page table.cost-table td {
+    display: table-cell !important;
+    padding: 5px 3px !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+    font-size: 8.5pt !important;
+  }
+
+  .page .col-name { width: 28% !important; text-align: left !important; white-space: normal !important; padding-left: 4px !important; }
+  .page .col-price { width: 11% !important; }
+  .page .col-vat { width: 7% !important; text-align: center !important; }
+  .page .col-gross { width: 11% !important; }
+  .page .col-qty { width: 7% !important; text-align: center !important; }
+  .page .col-tot-net { width: 12% !important; }
+  .page .col-tot-vat { width: 11% !important; }
+  .page .col-tot-gross { width: 13% !important; }
+
+  .page table.cost-table tr.total-row td {
+    border-top: 2px solid #0f172a !important;
+    border-bottom: 2px solid #0f172a !important;
+    background: #f8fafc !important;
+    font-weight: 700 !important;
+    font-size: 9pt !important;
+    padding: 6px 3px !important;
+  }
+
+  .page tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Financial Summary Print Fixes - 1 Line (3 columns) */
   .page .summary {
     display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+    margin-top: 4px !important;
+  }
+
+  .page .sum-item {
+    padding: 6px 10px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    background: #f8fafc !important;
+  }
+
+  .page .sum-label {
+    font-size: 7.5pt !important;
+    font-weight: 700 !important;
+    margin-bottom: 2px !important;
+  }
+
+  .page .sum-value {
+    font-size: 12pt !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
   }
 
   .page .conditions-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
+    gap: 12px !important;
   }
 
-  .page table.cost-table {
-    display: table !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-    white-space: normal !important;
-    overflow: visible !important;
-    margin-top: 15px !important;
-    margin-bottom: 20px !important;
-  }
-
-  .page table.cost-table th,
-  .page table.cost-table td {
-    display: table-cell !important;
-    padding: 8px 10px !important;
-    border: 1px solid #cbd5e1 !important;
-    font-size: 10pt !important;
-  }
-
-  .page table.cost-table th {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    font-weight: bold !important;
-  }
-
-  .page tr {
-    page-break-inside: avoid !important;
+  .page .signatures-section {
+    margin-top: 24px !important;
+    margin-bottom: 10px !important;
   }
 }
