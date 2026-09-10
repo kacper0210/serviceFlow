@@ -421,7 +421,7 @@ async function seedInitialDebts() {
       
       const initialDebts = [
         { creditor: "TATA", total: 400.00, installment: 0.00, capital: 0.00, interest: 0.00, dueDay: null },
-        { creditor: "WONGA", total: 3011.84, installment: 75.18, capital: 75.18, interest: 0.00, dueDay: 21 },
+        { creditor: "WONGA", total: 1620.22, installment: 75.18, capital: 19.35, interest: 55.83, dueDay: 21 },
         { creditor: "PKO BP limit", total: 3500.00, installment: 0.00, capital: 0.00, interest: 0.00, dueDay: 10 },
         { creditor: "MAMA KREDYT", total: 6069.25, installment: 397.98, capital: 324.64, interest: 73.34, dueDay: 2 },
         { creditor: "MARCELA KREDYT", total: 8289.00, installment: 415.39, capital: 315.23, interest: 100.16, dueDay: 10 },
