@@ -106,6 +106,8 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
   }, []);
 
   useEffect(() => {
+    setErrorMessage("");
+    setSuccessMessage("");
     loadInvoicesFromDb();
   }, [period]);
 
@@ -145,19 +147,20 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
     }
   };
 
-  const handleSyncKsef = async () => {
+  const handleSyncKsef = async (customLimit = null) => {
     setSyncing(true);
     setErrorMessage("");
     setSuccessMessage("");
     try {
       const authData = JSON.parse(localStorage.getItem("auth"));
+      const payload = customLimit ? { ...period, limit: customLimit } : period;
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/accounting/ksef/sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${authData?.token}`
         },
-        body: JSON.stringify(period)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok) {
@@ -170,7 +173,7 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
         if (data.warning) {
           setErrorMessage(data.warning);
         } else {
-          setSuccessMessage(`Zsynchronizowano z KSeF (${count} faktur w bazie).`);
+          setSuccessMessage(`Zsynchronizowano z KSeF ${customLimit ? `(Test: pobrano max ${customLimit} faktur na zapytanie)` : ''} (${count} faktur w bazie).`);
         }
       } else {
         setErrorMessage(data.error || "Błąd podczas synchronizacji z KSeF.");
@@ -179,6 +182,32 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
       setErrorMessage("Błąd połączenia z serwerem podczas synchronizacji KSeF.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleClearPeriod = async () => {
+    if (!window.confirm(`Czy na pewno chcesz wyczyścić niezaimportowane faktury KSeF z lokalnej bazy dla okresu ${period.month}/${period.year}?`)) {
+      return;
+    }
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/accounting/ksef/clear-period`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
+        body: JSON.stringify(period)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMessage(data.message);
+        setInvoices([]);
+      } else {
+        setErrorMessage(data.error || "Nie udało się wyczyścić faktur dla tego okresu.");
+      }
+    } catch (err) {
+      setErrorMessage("Błąd podczas czyszczenia bufora okresu.");
     }
   };
 
@@ -403,7 +432,7 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
             </div>
 
             <button
-              onClick={handleSyncKsef}
+              onClick={() => handleSyncKsef(null)}
               className="btn-primary"
               style={{ padding: "8px 18px", fontSize: "0.85rem", borderRadius: "6px" }}
               disabled={syncing || retryCountdown > 0}
@@ -418,6 +447,44 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
               ) : (
                 "🔄 Synchronizuj z KSeF"
               )}
+            </button>
+
+            <button
+              onClick={() => handleSyncKsef(5)}
+              className="btn-secondary"
+              title="Pobierz maksymalnie 5 faktur na próbę (zapobiega limitom MF)"
+              style={{
+                padding: "8px 12px",
+                fontSize: "0.82rem",
+                borderRadius: "6px",
+                border: "1px solid var(--border-color)",
+                background: "rgba(245, 158, 11, 0.1)",
+                color: "#f59e0b",
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+              disabled={syncing || retryCountdown > 0}
+            >
+              ⚡ Test (5 faktur)
+            </button>
+
+            <button
+              onClick={handleClearPeriod}
+              className="btn-secondary"
+              title="Wyczyść faktury KSeF z bazy dla wybranego okresu"
+              style={{
+                padding: "8px 12px",
+                fontSize: "0.82rem",
+                borderRadius: "6px",
+                border: "1px solid var(--border-color)",
+                background: "rgba(239, 68, 68, 0.1)",
+                color: "#ef4444",
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+              disabled={syncing}
+            >
+              🗑️ Wyczyść bufor okresu
             </button>
 
             <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginLeft: "8px", borderLeft: "1px solid var(--border-color)", paddingLeft: "12px" }}>

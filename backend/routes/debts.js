@@ -477,14 +477,184 @@ router.delete("/pending-bills/:id", asyncHandler(async (req, res) => {
    DEBT SCHEDULES (Harmonogram Spłat: 42 Raty Smartney i inne)
    ========================================================================= */
 
-// GET /api/debts/schedule/:debtId - Fetch full repayment schedule for a debt
-router.get("/schedule/:debtId", asyncHandler(async (req, res) => {
+// Helper to recalculate debt summary from schedule
+async function syncDebtWithSchedule(clientOrPool, debtId) {
+  try {
+    const schedRes = await clientOrPool.query(
+      "SELECT * FROM debt_schedules WHERE debt_id = $1 ORDER BY installment_number ASC",
+      [debtId]
+    );
+    if (schedRes.rows.length === 0) return;
+
+    const unpaidItems = schedRes.rows.filter(s => !s.is_paid);
+    const totalUnpaidCapital = unpaidItems.reduce((sum, s) => sum + parseAmount(s.capital_part), 0);
+
+    const firstUnpaid = unpaidItems[0] || schedRes.rows[0];
+    const nextMonthly = parseAmount(firstUnpaid.total_installment);
+    const nextCapital = parseAmount(firstUnpaid.capital_part);
+    const nextInterest = parseAmount(firstUnpaid.interest_part);
+
+    await clientOrPool.query(
+      `UPDATE debts 
+       SET total_amount = $1,
+           monthly_installment = CASE WHEN $2::numeric > 0 THEN $2::numeric ELSE monthly_installment END,
+           capital_installment = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE capital_installment END,
+           interest_installment = CASE WHEN $4::numeric > 0 THEN $4::numeric ELSE interest_installment END,
+           updated_at = NOW()
+       WHERE id = $5`,
+      [totalUnpaidCapital > 0 ? totalUnpaidCapital : parseAmount(schedRes.rows[schedRes.rows.length - 1].remaining_balance), nextMonthly, nextCapital, nextInterest, debtId]
+    );
+  } catch (err) {
+    console.error("[Sync Debt With Schedule Error]", err);
+  }
+}
+
+// GET /api/debts/:debtId/schedule & /api/debts/schedule/:debtId
+router.get(["/schedule/:debtId", "/:debtId/schedule"], asyncHandler(async (req, res) => {
   const { debtId } = req.params;
   const { rows } = await pool.query(
     "SELECT id, debt_id, installment_number, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at FROM debt_schedules WHERE debt_id = $1 ORDER BY installment_number ASC",
     [debtId]
   );
-  res.json(rows);
+  res.json({ schedule: rows });
+}));
+
+// POST /api/debts/:debtId/schedule/import - Bulk import schedule items (replaces or appends)
+router.post("/:debtId/schedule/import", asyncHandler(async (req, res) => {
+  const { debtId } = req.params;
+  const { items, replace_existing } = req.body; // items: Array of { installment_number, due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Brak pozycji w harmonogramie do zaimportowania" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    if (replace_existing !== false) {
+      await client.query("DELETE FROM debt_schedules WHERE debt_id = $1", [debtId]);
+    }
+
+    let insertedCount = 0;
+    for (const item of items) {
+      const num = parseInt(item.installment_number, 10) || (insertedCount + 1);
+      const dueDate = item.due_date ? String(item.due_date).trim() : new Date().toISOString().split('T')[0];
+      const total = parseAmount(item.total_installment);
+      const cap = parseAmount(item.capital_part) || total;
+      const intVal = parseAmount(item.interest_part);
+      const rem = parseAmount(item.remaining_balance);
+      const isPaid = Boolean(item.is_paid);
+
+      await client.query(
+        `INSERT INTO debt_schedules (debt_id, installment_number, due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [debtId, num, dueDate, total, cap, intVal, rem, isPaid, isPaid ? new Date() : null]
+      );
+      insertedCount++;
+    }
+
+    await syncDebtWithSchedule(client, debtId);
+    await recordAutoSnapshot(client);
+
+    await client.query("COMMIT");
+
+    const fetchSched = await pool.query(
+      "SELECT id, debt_id, installment_number, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at FROM debt_schedules WHERE debt_id = $1 ORDER BY installment_number ASC",
+      [debtId]
+    );
+
+    res.status(201).json({ message: `Zaimportowano ${insertedCount} rat harmonogramu`, schedule: fetchSched.rows });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[Schedule Import Error]", err);
+    res.status(500).json({ error: "Błąd podczas importu harmonogramu" });
+  } finally {
+    client.release();
+  }
+}));
+
+// POST /api/debts/:debtId/schedule/item - Add single new schedule item
+router.post("/:debtId/schedule/item", asyncHandler(async (req, res) => {
+  const { debtId } = req.params;
+  const { installment_number, due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid } = req.body;
+
+  if (!due_date || total_installment === undefined) {
+    return res.status(400).json({ error: "Podaj datę płatności i kwotę raty" });
+  }
+
+  const num = parseInt(installment_number, 10) || 1;
+  const total = parseAmount(total_installment);
+  const cap = parseAmount(capital_part) || total;
+  const intVal = parseAmount(interest_part);
+  const rem = parseAmount(remaining_balance);
+  const isPaid = Boolean(is_paid);
+
+  const { rows } = await pool.query(
+    `INSERT INTO debt_schedules (debt_id, installment_number, due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, debt_id, installment_number, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at`,
+    [debtId, num, due_date, total, cap, intVal, rem, isPaid, isPaid ? new Date() : null]
+  );
+
+  await syncDebtWithSchedule(pool, debtId);
+
+  res.status(201).json(rows[0]);
+}));
+
+// PUT /api/debts/schedule/item/:scheduleId - Update single schedule item
+router.put("/schedule/item/:scheduleId", asyncHandler(async (req, res) => {
+  const { scheduleId } = req.params;
+  const { installment_number, due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid } = req.body;
+
+  const current = await pool.query("SELECT debt_id FROM debt_schedules WHERE id = $1", [scheduleId]);
+  if (current.rows.length === 0) return res.status(404).json({ error: "Brak wpisu raty w harmonogramie" });
+
+  const debtId = current.rows[0].debt_id;
+  const total = parseAmount(total_installment);
+  const cap = parseAmount(capital_part) || total;
+  const intVal = parseAmount(interest_part);
+  const rem = parseAmount(remaining_balance);
+
+  const { rows } = await pool.query(
+    `UPDATE debt_schedules
+     SET installment_number = $1,
+         due_date = $2,
+         total_installment = $3,
+         capital_part = $4,
+         interest_part = $5,
+         remaining_balance = $6,
+         is_paid = $7,
+         paid_at = CASE WHEN $7 THEN COALESCE(paid_at, NOW()) ELSE NULL END
+     WHERE id = $8
+     RETURNING id, debt_id, installment_number, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, total_installment, capital_part, interest_part, remaining_balance, is_paid, paid_at`,
+    [parseInt(installment_number, 10) || 1, due_date, total, cap, intVal, rem, Boolean(is_paid), scheduleId]
+  );
+
+  await syncDebtWithSchedule(pool, debtId);
+
+  res.json(rows[0]);
+}));
+
+// DELETE /api/debts/schedule/item/:scheduleId - Delete a single schedule item
+router.delete("/schedule/item/:scheduleId", asyncHandler(async (req, res) => {
+  const { scheduleId } = req.params;
+  const current = await pool.query("SELECT debt_id FROM debt_schedules WHERE id = $1", [scheduleId]);
+  if (current.rows.length === 0) return res.status(404).json({ error: "Brak wpisu" });
+
+  const debtId = current.rows[0].debt_id;
+  await pool.query("DELETE FROM debt_schedules WHERE id = $1", [scheduleId]);
+
+  await syncDebtWithSchedule(pool, debtId);
+
+  res.json({ message: "Usunięto ratę z harmonogramu" });
+}));
+
+// DELETE /api/debts/:debtId/schedule - Clear full schedule for a debt
+router.delete("/:debtId/schedule", asyncHandler(async (req, res) => {
+  const { debtId } = req.params;
+  await pool.query("DELETE FROM debt_schedules WHERE debt_id = $1", [debtId]);
+  res.json({ message: "Wyczyszczono harmonogram spłat" });
 }));
 
 async function handleToggleScheduleItem(scheduleId, res) {
@@ -534,8 +704,8 @@ async function handleToggleScheduleItem(scheduleId, res) {
       `UPDATE debts 
        SET total_amount = $1, 
            is_paid_this_month = $2,
-           capital_installment = CASE WHEN $3 > 0 THEN $3 ELSE capital_installment END,
-           interest_installment = CASE WHEN $4 > 0 THEN $4 ELSE interest_installment END,
+           capital_installment = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE capital_installment END,
+           interest_installment = CASE WHEN $4::numeric > 0 THEN $4::numeric ELSE interest_installment END,
            updated_at = NOW() 
        WHERE id = $5`,
       [newTotal, hasPaidInCurrentMonth, capitalPart, interestPart, debt.id]
@@ -718,8 +888,8 @@ router.put("/:id/toggle-monthly-paid", asyncHandler(async (req, res) => {
       `UPDATE debts 
        SET total_amount = $1, 
            is_paid_this_month = $2, 
-           capital_installment = CASE WHEN $5 > 0 THEN $5 ELSE capital_installment END,
-           interest_installment = CASE WHEN $6 > 0 THEN $6 ELSE interest_installment END,
+           capital_installment = CASE WHEN $5::numeric > 0 THEN $5::numeric ELSE capital_installment END,
+           interest_installment = CASE WHEN $6::numeric > 0 THEN $6::numeric ELSE interest_installment END,
            last_paid_date = $3, 
            updated_at = NOW()
        WHERE id = $4

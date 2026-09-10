@@ -145,7 +145,7 @@ router.get("/ksef/invoices", checkAuth, asyncHandler(async (req, res) => {
 
 // POST /api/accounting/ksef/sync
 router.post("/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
-  const { year, month } = req.body;
+  const { year, month, limit } = req.body;
   if (!year || !month) return res.status(400).json({ error: "Brak zdefiniowanego okresu" });
   
   const settingsRes = await pool.query("SELECT * FROM ksef_settings LIMIT 1");
@@ -167,7 +167,8 @@ router.post("/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
       decryptedToken,
       env,
       year,
-      month
+      month,
+      limit ? parseInt(limit, 10) : null
     );
     res.json({ success: true, invoices, last_sync_at: new Date() });
   } catch (err) {
@@ -197,6 +198,27 @@ router.post("/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
         : `Błąd połączenia z KSeF (${err.message}). Wyświetlono faktury z lokalnej bazy.`
     });
   }
+}));
+
+// POST /api/accounting/ksef/clear-period - Clears local KSeF invoices cache for a period
+router.post("/ksef/clear-period", checkAuth, asyncHandler(async (req, res) => {
+  const { year, month } = req.body;
+  if (!year || !month) return res.status(400).json({ error: "Brak zdefiniowanego okresu" });
+
+  const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const deleteRes = await pool.query(
+    `DELETE FROM ksef_invoices WHERE date >= $1 AND date <= $2`,
+    [dateFrom, dateTo]
+  );
+
+  res.json({
+    success: true,
+    message: `Usunięto ${deleteRes.rowCount} niezaimportowanych faktur KSeF dla okresu ${month}/${year}.`,
+    deletedCount: deleteRes.rowCount
+  });
 }));
 
 // POST /api/accounting/ksef/fetch

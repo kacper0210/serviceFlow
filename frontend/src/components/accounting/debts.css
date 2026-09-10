@@ -901,4 +901,250 @@ body.dark-mode .breakdown-item {
   }
 }
 
+/* Schedule Import & Schedule Item Editing Extensions */
+.schedule-modal-large {
+  max-width: 1000px !important;
+  width: 95% !important;
+}
+
+.schedule-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 14px;
+}
+
+.schedule-action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.import-dropzone {
+  border: 2px dashed #6366f1;
+  background: rgba(99, 102, 241, 0.04);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 14px;
+}
+
+.import-dropzone:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: #4f46e5;
+}
+
+.import-textarea {
+  width: 100%;
+  min-height: 140px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.import-preview-box {
+  margin-top: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--bg-card);
+}
+
+.import-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.badge-success {
+  background: #10b981;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.schedule-item-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+/* Mobile Responsiveness for Schedule Actions & Full-Screen Modal */
+@media (max-width: 600px) {
+  .debt-modal-overlay {
+    padding: 0 !important;
+  }
+
+  .debt-modal-box.schedule-modal-large,
+  .schedule-modal-large {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 12px 10px !important;
+    border-radius: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+  }
+
+  .schedule-modal-large .schedule-table-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-top: 6px;
+    border: none !important;
+  }
+
+  .schedule-action-bar {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 4px 0;
+    margin-bottom: 6px;
+    background: transparent;
+    border: none;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule-action-buttons {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    width: auto;
+    gap: 6px;
+  }
+
+  .schedule-action-buttons button,
+  .schedule-action-bar > button {
+    width: auto !important;
+    justify-content: center;
+    text-align: center;
+    padding: 5px 9px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Hide raw table header on mobile */
+  .schedule-table-container table.minimal-table thead {
+    display: none;
+  }
+
+  /* Format table rows into compact 2-line mobile card items */
+  .schedule-table-container table.minimal-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+    gap: 4px;
+    box-sizing: border-box;
+  }
+
+  .schedule-table-container table.minimal-table tbody td {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 3px;
+    border: none !important;
+    font-size: 0.82rem;
+    background: transparent !important;
+  }
+
+  /* 1. Lp. */
+  .schedule-table-container table.minimal-table tbody td:nth-child(1) {
+    font-weight: 800;
+    color: var(--primary-color, #6366f1);
+    font-size: 0.88rem;
+    order: 1;
+  }
+
+  /* 2. Checkbox */
+  .schedule-table-container table.minimal-table tbody td:nth-child(2) {
+    order: 2;
+  }
+
+  /* 3. Termin Spłaty */
+  .schedule-table-container table.minimal-table tbody td:nth-child(3) {
+    font-weight: 600;
+    color: var(--text-main);
+    order: 3;
+    margin-left: 4px;
+  }
+
+  /* 4. Rata Kredytu */
+  .schedule-table-container table.minimal-table tbody td:nth-child(4) {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    margin-left: auto;
+    order: 4;
+  }
+
+  /* Line 2 Container: Kapitał, Odsetki, Saldo */
+  .schedule-table-container table.minimal-table tbody td:nth-child(5),
+  .schedule-table-container table.minimal-table tbody td:nth-child(6),
+  .schedule-table-container table.minimal-table tbody td:nth-child(7) {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    order: 5;
+  }
+
+  .schedule-table-container table.minimal-table tbody td:nth-child(5)::before {
+    content: "Kap: ";
+    font-weight: 700;
+    color: #10b981;
+  }
+
+  .schedule-table-container table.minimal-table tbody td:nth-child(6)::before {
+    content: " • Ods: ";
+    font-weight: 700;
+    color: #ef4444;
+  }
+
+  .schedule-table-container table.minimal-table tbody td:nth-child(7)::before {
+    content: " • Saldo: ";
+    font-weight: 700;
+  }
+
+  /* 8. Akcje */
+  .schedule-table-container table.minimal-table tbody td:nth-child(8) {
+    order: 6;
+    margin-left: auto;
+  }
+
+  .import-preview-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 

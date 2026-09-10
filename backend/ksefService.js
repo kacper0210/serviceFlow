@@ -54,14 +54,14 @@ function decryptToken(encryptedToken, ivHex, tagHex) {
 /**
  * Wrapper around fetch with exponential backoff retry for HTTP 429 Rate Limits.
  */
-async function fetchWithRetry(url, options = {}, maxRetries = 2) {
+async function fetchWithRetry(url, options = {}, maxRetries = 3) {
   let attempt = 0;
   while (attempt <= maxRetries) {
     const res = await fetch(url, options);
     if (res.status === 429) {
       attempt++;
       const retryAfterHeader = res.headers.get('retry-after');
-      let waitSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 3600;
+      let waitSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 2;
       
       let detailMsg = null;
       try {
@@ -69,14 +69,23 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
         const errJson = JSON.parse(text);
         if (errJson?.status?.details?.[0]) {
           detailMsg = errJson.status.details[0];
-          const match = detailMsg.match(/(\d+)\s*minut/i);
-          if (match) {
-            waitSeconds = parseInt(match[1], 10) * 60;
+          const matchMin = detailMsg.match(/(\d+)\s*minut/i);
+          const matchSec = detailMsg.match(/(\d+)\s*sekund/i);
+          if (matchMin) {
+            waitSeconds = parseInt(matchMin[1], 10) * 60;
+          } else if (matchSec) {
+            waitSeconds = parseInt(matchSec[1], 10);
           }
         }
       } catch (e) {}
 
-      const msg = detailMsg || `Przekroczono limit zapytań KSeF (błąd HTTP 429: max 20 żądań na godzinę). Odczekaj podany czas przed kolejną synchronizacją.`;
+      if (attempt <= maxRetries && waitSeconds <= 10) {
+        console.log(`[KSeF Rate Limit] HTTP 429 received (${detailMsg || waitSeconds + 's'}). Waiting ${(waitSeconds + 0.5)}s before retry ${attempt}/${maxRetries}...`);
+        await new Promise(r => setTimeout(r, Math.max(1.5, waitSeconds + 0.5) * 1000));
+        continue;
+      }
+
+      const msg = detailMsg || `Przekroczono limit zapytań KSeF (błąd HTTP 429). Odczekaj podany czas przed kolejną synchronizacją.`;
       const err = new Error(msg);
       err.retryAfter = waitSeconds;
       err.status = 429;
@@ -419,36 +428,6 @@ async function refreshKSeFToken(session, pool = null) {
 }
 
 /**
- * Gets an active KSeF session (from Memory Cache, DB, Refresh, or Fresh Handshake).
- */
-async function getActiveSession(nip, decryptedToken, env, pool = null) {
-  // 1. Check Memory Cache
-  const cached = sessionCache.get(nip);
-  if (cached && cached.env === env) {
-    if (Date.now() < cached.expiresAt) {
-      return cached;
-    }
-    try {
-      return await refreshKSeFToken(cached, pool);
-    } catch (e) {
-      console.warn("Memory refresh failed, trying DB", e.message);
-    }
-  }
-
-  // 2. Check Database Cache
-  if (pool) {
-    const dbSession = await loadSessionFromDb(pool, nip, env);
-    if (dbSession) {
-      sessionCache.set(nip, dbSession);
-      return dbSession;
-    }
-  }
-
-  // 3. Fallback to Fresh Authentication
-  return await authenticateKSeF(nip, decryptedToken, env, pool);
-}
-
-/**
  * Auto-categorizes contractor name/NIP into expenses category & car cost flag.
  */
 function determineCategory(contractorName = '', contractorNip = '') {
@@ -506,7 +485,7 @@ function determineCategory(contractorName = '', contractorNip = '') {
 /**
  * Synchronizes & Caches KSeF invoices into local Database (`ksef_invoices`).
  */
-async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month) {
+async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, limit = null) {
   let invoicesToCache = [];
 
   if (env === 'mock') {
@@ -520,15 +499,13 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month) {
     const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     
     const queryUrl = `${apiUrl}/invoices/query/metadata`;
-    let pageOffset = 0;
-    const pageSize = 100;
+    const pageSize = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 100;
     let allInvoices = [];
-    let hasMore = true;
 
     for (const subjectType of ["Subject1", "Subject2"]) {
       if (subjectType === "Subject2") {
-        // Pause 1.2s between query requests to prevent MF API burst Rate Limit
-        await new Promise(r => setTimeout(r, 1200));
+        // Pause 1.5s between query requests to prevent MF API burst Rate Limit
+        await new Promise(r => setTimeout(r, 1500));
       }
       const isSales = subjectType === "Subject1";
       let pageOffset = 0;
@@ -612,7 +589,21 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month) {
               subject_type: subjectType
             });
           }
-          hasMore = data.hasMore === true;
+          // Advance to the next page. Without this, PageOffset stayed at 0 forever
+          // whenever the API reported hasMore=true, so the loop kept re-requesting
+          // the SAME first page as fast as possible - hammering the KSeF
+          // /invoices/query/metadata endpoint (limit: 8/s, 16/min, 20/h) until MF
+          // blocked further requests for the rest of the hour. This is why even a
+          // "first" sync could get blocked instantly whenever a subject had more
+          // invoices than one page (PageSize).
+          pageOffset += list.length || pageSize;
+          hasMore = limit ? false : (data.hasMore === true && list.length > 0);
+
+          // Small pause between pages of the same subject so we stay under the
+          // per-second/per-minute sub-limits too, not just the hourly one.
+          if (hasMore) {
+            await new Promise(r => setTimeout(r, 1200));
+          }
         } else {
           hasMore = false;
         }

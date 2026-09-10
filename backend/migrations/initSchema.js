@@ -4,7 +4,15 @@ async function ensureDbTablesExist() {
   try {
     console.log("[DB Migration] Verifying KSeF, Offers, Accounting, and Issues tables in PostgreSQL database...");
     
-    await pool.query(`
+    const safeQuery = async (sql, description) => {
+      try {
+        await pool.query(sql);
+      } catch (err) {
+        console.warn(`[DB Migration Warning] ${description} failed (continuing):`, err.message);
+      }
+    };
+
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS ksef_settings (
         id SERIAL PRIMARY KEY,
         nip VARCHAR(50),
@@ -23,7 +31,6 @@ async function ensureDbTablesExist() {
         access_token_expires_at BIGINT,
         last_sync_at TIMESTAMP
       );
-
       ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS encrypted_access_token TEXT;
       ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS access_token_iv VARCHAR(100);
       ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS access_token_tag VARCHAR(100);
@@ -32,9 +39,9 @@ async function ensureDbTablesExist() {
       ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS refresh_token_tag VARCHAR(100);
       ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS access_token_expires_at BIGINT;
       ALTER TABLE ksef_settings ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP;
-    `);
+    `, "ksef_settings");
 
-    await pool.query(`
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS ksef_invoices (
         id SERIAL PRIMARY KEY,
         ksef_reference_number VARCHAR(100) UNIQUE,
@@ -52,21 +59,18 @@ async function ensureDbTablesExist() {
         is_sales BOOLEAN DEFAULT FALSE,
         subject_type VARCHAR(20) DEFAULT 'Subject2',
         xml_content TEXT,
-        accounting_entry_id INTEGER REFERENCES accounting_entries(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-
       ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS is_car_cost BOOLEAN DEFAULT FALSE;
       ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS suggested_category VARCHAR(100);
       ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE;
       ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS subject_type VARCHAR(20) DEFAULT 'Subject2';
       ALTER TABLE ksef_invoices ADD COLUMN IF NOT EXISTS xml_content TEXT;
-    `);
+    `, "ksef_invoices");
 
-    await pool.query(`
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS offers (
         id SERIAL PRIMARY KEY,
-        client_id INT REFERENCES clients(id) ON DELETE SET NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         status VARCHAR(50) DEFAULT 'robocza',
@@ -78,8 +82,6 @@ async function ensureDbTablesExist() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-
-      ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS description TEXT;
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS notes TEXT;
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS total_vat DECIMAL(12, 2) DEFAULT 0.00;
@@ -87,10 +89,9 @@ async function ensureDbTablesExist() {
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_nip VARCHAR(50);
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_address TEXT;
-      
-      ALTER TABLE offers ALTER COLUMN offer_number DROP NOT NULL;
-      ALTER TABLE offers ALTER COLUMN client_name DROP NOT NULL;
+    `, "offers");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS offer_items (
         id SERIAL PRIMARY KEY,
         offer_id INT REFERENCES offers(id) ON DELETE CASCADE,
@@ -104,23 +105,9 @@ async function ensureDbTablesExist() {
         vat_amount DECIMAL(12, 2) DEFAULT 0.00,
         gross_amount DECIMAL(12, 2) DEFAULT 0.00
       );
+    `, "offer_items");
 
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS title VARCHAR(255);
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS description TEXT;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS quantity DECIMAL(10, 2) DEFAULT 1.00;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'szt.';
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12, 2) DEFAULT 0.00;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS unit_price_net DECIMAL(12, 2) DEFAULT 0.00;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS vat_rate INTEGER DEFAULT 23;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS net_amount DECIMAL(12, 2) DEFAULT 0.00;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS vat_amount DECIMAL(12, 2) DEFAULT 0.00;
-      ALTER TABLE offer_items ADD COLUMN IF NOT EXISTS gross_amount DECIMAL(12, 2) DEFAULT 0.00;
-
-      ALTER TABLE offer_items ALTER COLUMN unit_price DROP NOT NULL;
-      ALTER TABLE offer_items ALTER COLUMN unit_price_net DROP NOT NULL;
-
-      ALTER TABLE orders ALTER COLUMN client_id DROP NOT NULL;
-
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS issues (
         id SERIAL PRIMARY KEY,
         type VARCHAR(50) NOT NULL,
@@ -128,7 +115,9 @@ async function ensureDbTablesExist() {
         status VARCHAR(50) DEFAULT 'open',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `, "issues");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS debts (
         id SERIAL PRIMARY KEY,
         creditor VARCHAR(255) NOT NULL,
@@ -144,12 +133,13 @@ async function ensureDbTablesExist() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-
       ALTER TABLE debts ADD COLUMN IF NOT EXISTS capital_installment NUMERIC(12, 2) DEFAULT 0.00;
       ALTER TABLE debts ADD COLUMN IF NOT EXISTS interest_installment NUMERIC(12, 2) DEFAULT 0.00;
       ALTER TABLE debts ADD COLUMN IF NOT EXISTS is_paid_this_month BOOLEAN DEFAULT FALSE;
       ALTER TABLE debts ADD COLUMN IF NOT EXISTS last_paid_date DATE;
+    `, "debts");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS debt_snapshots (
         id SERIAL PRIMARY KEY,
         snapshot_date DATE NOT NULL UNIQUE,
@@ -157,7 +147,9 @@ async function ensureDbTablesExist() {
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `, "debt_snapshots");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS debt_payments (
         id SERIAL PRIMARY KEY,
         debt_id INT REFERENCES debts(id) ON DELETE CASCADE,
@@ -171,7 +163,9 @@ async function ensureDbTablesExist() {
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `, "debt_payments");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS fixed_expenses (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -182,10 +176,11 @@ async function ensureDbTablesExist() {
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-
       ALTER TABLE fixed_expenses ADD COLUMN IF NOT EXISTS is_paid_this_month BOOLEAN DEFAULT FALSE;
       ALTER TABLE fixed_expenses ADD COLUMN IF NOT EXISTS last_paid_date DATE;
+    `, "fixed_expenses");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS fixed_incomes (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -196,9 +191,10 @@ async function ensureDbTablesExist() {
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-
       CREATE INDEX IF NOT EXISTS idx_fixed_incomes_active ON fixed_incomes(is_active);
+    `, "fixed_incomes");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS pending_bills (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -211,7 +207,9 @@ async function ensureDbTablesExist() {
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `, "pending_bills");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS debt_schedules (
         id SERIAL PRIMARY KEY,
         debt_id INT REFERENCES debts(id) ON DELETE CASCADE,
@@ -225,7 +223,9 @@ async function ensureDbTablesExist() {
         paid_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `, "debt_schedules");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS seller_settings (
         id SERIAL PRIMARY KEY,
         company_name VARCHAR(255) DEFAULT 'KMTechFix Kacper Wójcik',
@@ -237,7 +237,9 @@ async function ensureDbTablesExist() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `, "seller_settings");
 
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS invoices (
         id SERIAL PRIMARY KEY,
         invoice_number VARCHAR(100) UNIQUE NOT NULL,
@@ -252,9 +254,6 @@ async function ensureDbTablesExist() {
         buyer_name VARCHAR(255) NOT NULL,
         buyer_nip VARCHAR(50),
         buyer_address TEXT,
-        buyer_id INT REFERENCES clients(id) ON DELETE SET NULL,
-        order_id INT REFERENCES orders(id) ON DELETE SET NULL,
-        offer_id INT REFERENCES offers(id) ON DELETE SET NULL,
         status VARCHAR(50) DEFAULT 'issued',
         notes TEXT,
         ksef_reference_number VARCHAR(100),
@@ -288,21 +287,10 @@ async function ensureDbTablesExist() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS split_payment BOOLEAN DEFAULT FALSE;
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaction_description VARCHAR(255);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS document_type VARCHAR(50) DEFAULT 'faktura_vat';
+    `, "invoices");
 
-      ALTER TABLE clients ADD COLUMN IF NOT EXISTS street VARCHAR(255);
-      ALTER TABLE clients ADD COLUMN IF NOT EXISTS house_no VARCHAR(50);
-      ALTER TABLE clients ADD COLUMN IF NOT EXISTS apt_no VARCHAR(50);
-      ALTER TABLE clients ADD COLUMN IF NOT EXISTS postal_code VARCHAR(50);
-      ALTER TABLE clients ADD COLUMN IF NOT EXISTS city VARCHAR(100);
-
-      ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5, 2) DEFAULT 0.00;
-
-      -- Performance Optimization: B-Tree Indexes
+    await safeQuery(`
       CREATE INDEX IF NOT EXISTS idx_ksef_invoices_date ON ksef_invoices(date DESC);
-      CREATE INDEX IF NOT EXISTS idx_accounting_entries_date_type ON accounting_entries(date DESC, entry_type);
-      CREATE INDEX IF NOT EXISTS idx_orders_client_id ON orders(client_id);
-      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-      CREATE INDEX IF NOT EXISTS idx_offers_client_id ON offers(client_id);
       CREATE INDEX IF NOT EXISTS idx_issues_status_created ON issues(status, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_debts_creditor ON debts(creditor);
       CREATE INDEX IF NOT EXISTS idx_debt_snapshots_date ON debt_snapshots(snapshot_date DESC);
@@ -310,8 +298,7 @@ async function ensureDbTablesExist() {
       CREATE INDEX IF NOT EXISTS idx_fixed_expenses_active ON fixed_expenses(is_active);
       CREATE INDEX IF NOT EXISTS idx_pending_bills_due ON pending_bills(due_date DESC, is_paid);
       CREATE INDEX IF NOT EXISTS idx_debt_schedules_debt ON debt_schedules(debt_id, installment_number);
-      CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON invoices(issue_date DESC);
-    `);
+    `, "indexes");
 
     // Ensure default seller settings exist
     const sellerCheck = await pool.query("SELECT COUNT(*) FROM seller_settings");

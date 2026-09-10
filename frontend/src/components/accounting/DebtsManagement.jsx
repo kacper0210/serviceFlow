@@ -1,6 +1,166 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import "./debts.css";
 
+// Helper parser for HTML <table>, CSV, JSON, and pasted text schedule content
+function parseScheduleContent(rawInput) {
+  if (!rawInput || !rawInput.trim()) return [];
+
+  const text = rawInput.trim();
+  const parsedRows = [];
+
+  const parseVal = (str) => {
+    if (typeof str === 'number') return str;
+    if (!str) return 0;
+    const cleaned = String(str).replace(/[^\d.,-]/g, '').trim();
+    if (!cleaned) return 0;
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+      const val = parseFloat(normalized);
+      return isNaN(val) ? 0 : val;
+    }
+    if (cleaned.includes(',')) {
+      const normalized = cleaned.replace(',', '.');
+      const val = parseFloat(normalized);
+      return isNaN(val) ? 0 : val;
+    }
+    const val = parseFloat(cleaned);
+    return isNaN(val) ? 0 : val;
+  };
+
+  const parseDateStr = (str) => {
+    if (!str) return null;
+    const s = String(str).trim();
+    const isoMatch = s.match(/\b(20\d{2})[-/.](0[1-9]|1[0-2])[-/.](0[1-9]|[12]\d|3[01])\b/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+    const plMatch = s.match(/\b(0[1-9]|[12]\d|3[01])[-/.](0[1-9]|1[0-2])[-/.](20\d{2})\b/);
+    if (plMatch) return `${plMatch[3]}-${plMatch[2]}-${plMatch[1]}`;
+
+    return null;
+  };
+
+  if (text.startsWith('[') || text.startsWith('{')) {
+    try {
+      const parsedJson = JSON.parse(text);
+      const arr = Array.isArray(parsedJson) ? parsedJson : (parsedJson.schedule || parsedJson.items || []);
+      return arr.map((item, idx) => ({
+        installment_number: parseInt(item.installment_number || item.num || item.lp || (idx + 1), 10),
+        due_date: parseDateStr(item.due_date || item.date || item.termin) || new Date().toISOString().split('T')[0],
+        total_installment: parseVal(item.total_installment || item.total || item.rata || item.amount),
+        capital_part: parseVal(item.capital_part || item.capital || item.cap || item.kapital),
+        interest_part: parseVal(item.interest_part || item.interest || item.int || item.odsetki),
+        remaining_balance: parseVal(item.remaining_balance || item.remaining || item.rem || item.saldo),
+        is_paid: Boolean(item.is_paid || item.paid || item.splacono)
+      }));
+    } catch (e) {
+      // not JSON
+    }
+  }
+
+  if (text.includes('<tr') || text.includes('<td') || text.includes('<table')) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/html');
+      const rows = doc.querySelectorAll('tr');
+
+      rows.forEach((tr) => {
+        const cells = Array.from(tr.querySelectorAll('td, th')).map(c => c.textContent.trim());
+        if (cells.length < 3) return;
+
+        const joined = cells.join(' ').toLowerCase();
+        if (joined.includes('nr raty') || joined.includes('termin spłaty') || joined.includes('kapitał') || joined.includes('data płatności')) {
+          return;
+        }
+
+        let dateVal = null;
+        let numVal = null;
+        const numbers = [];
+
+        cells.forEach((cellText, cellIdx) => {
+          const dt = parseDateStr(cellText);
+          if (dt && !dateVal) {
+            dateVal = dt;
+            return;
+          }
+          const numMatch = cellText.match(/^#?(\d+)\.?$/);
+          if (numMatch && !numVal && cellIdx < 2) {
+            numVal = parseInt(numMatch[1], 10);
+            return;
+          }
+
+          const val = parseVal(cellText);
+          if (val !== 0 || cellText.includes('0')) {
+            numbers.push(val);
+          }
+        });
+
+        if (dateVal || numbers.length >= 2) {
+          parsedRows.push({
+            installment_number: numVal || (parsedRows.length + 1),
+            due_date: dateVal || new Date().toISOString().split('T')[0],
+            total_installment: numbers[0] || 0,
+            capital_part: numbers[1] || numbers[0] || 0,
+            interest_part: numbers[2] || 0,
+            remaining_balance: numbers[3] || 0,
+            is_paid: false
+          });
+        }
+      });
+
+      if (parsedRows.length > 0) return parsedRows;
+    } catch (e) {
+      console.warn("HTML parse error:", e);
+    }
+  }
+
+  const lines = text.split(/\r?\n/);
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('termin') && lower.includes('kapitał')) return;
+
+    const parts = trimmed.split(/[\t;]|(?:\s{2,})/).filter(p => p.trim());
+    if (parts.length < 2) return;
+
+    let dateVal = null;
+    let numVal = null;
+    const numbers = [];
+
+    parts.forEach((partText, pIdx) => {
+      const dt = parseDateStr(partText);
+      if (dt && !dateVal) {
+        dateVal = dt;
+        return;
+      }
+      const numMatch = partText.match(/^#?(\d+)\.?$/);
+      if (numMatch && !numVal && pIdx < 2) {
+        numVal = parseInt(numMatch[1], 10);
+        return;
+      }
+      const val = parseVal(partText);
+      if (val !== 0 || partText.includes('0')) {
+        numbers.push(val);
+      }
+    });
+
+    if (dateVal || numbers.length >= 2) {
+      parsedRows.push({
+        installment_number: numVal || (parsedRows.length + 1),
+        due_date: dateVal || new Date().toISOString().split('T')[0],
+        total_installment: numbers[0] || 0,
+        capital_part: numbers[1] || numbers[0] || 0,
+        interest_part: numbers[2] || 0,
+        remaining_balance: numbers[3] || 0,
+        is_paid: false
+      });
+    }
+  });
+
+  return parsedRows;
+}
+
 export default function DebtsManagement() {
   const [debts, setDebts] = useState([]);
   const [summary, setSummary] = useState({ total_debt: 0, total_installments: 0 });
@@ -35,6 +195,35 @@ export default function DebtsManagement() {
   const [activeScheduleDebt, setActiveScheduleDebt] = useState(null);
   const [activeScheduleList, setActiveScheduleList] = useState([]);
   const [scheduleFilter, setScheduleFilter] = useState("unpaid"); // "unpaid" | "all"
+
+  // Schedule Import & Edit Extended States
+  const [showImportScheduleModal, setShowImportScheduleModal] = useState(false);
+  const [importRawInput, setImportRawInput] = useState("");
+  const [parsedImportList, setParsedImportList] = useState([]);
+  const [replaceExistingSchedule, setReplaceExistingSchedule] = useState(true);
+
+  const [showEditScheduleItemModal, setShowEditScheduleItemModal] = useState(false);
+  const [editingScheduleItem, setEditingScheduleItem] = useState(null);
+  const [scheduleItemForm, setScheduleItemForm] = useState({
+    installment_number: 1,
+    due_date: new Date().toISOString().split('T')[0],
+    total_installment: "",
+    capital_part: "",
+    interest_part: "",
+    remaining_balance: "",
+    is_paid: false
+  });
+
+  const [showGenerateScheduleModal, setShowGenerateScheduleModal] = useState(false);
+  const [generateForm, setGenerateForm] = useState({
+    start_date: new Date().toISOString().split('T')[0],
+    months_count: 12,
+    monthly_total: "",
+    capital_part: "",
+    interest_part: "",
+    due_day: 10,
+    initial_debt: ""
+  });
 
   // Fixed Incomes (Stałe Wpływy)
   const [fixedIncomes, setFixedIncomes] = useState([]);
@@ -164,8 +353,238 @@ export default function DebtsManagement() {
       });
       if (res.ok) {
         const data = await res.json();
-        setActiveScheduleList(Array.isArray(data.schedule) ? data.schedule : []);
+        const sched = Array.isArray(data.schedule) ? data.schedule : (Array.isArray(data) ? data : []);
+        setActiveScheduleList(sched);
         setShowScheduleModal(true);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Schedule Import Handlers
+  const handleImportInputChange = (val) => {
+    setImportRawInput(val);
+    const parsed = parseScheduleContent(val);
+    setParsedImportList(parsed);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target.result;
+      handleImportInputChange(content);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleSaveImportedSchedule = async () => {
+    if (!activeScheduleDebt || parsedImportList.length === 0) return;
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${baseUrl}/api/debts/${activeScheduleDebt.id}/schedule/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
+        body: JSON.stringify({
+          items: parsedImportList,
+          replace_existing: replaceExistingSchedule
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setShowImportScheduleModal(false);
+        setImportRawInput("");
+        setParsedImportList([]);
+        if (activeScheduleDebt) openScheduleModal(activeScheduleDebt);
+        fetchData();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Błąd importu harmonogramu");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Błąd połączenia podczas importu");
+    }
+  };
+
+  // Single Schedule Item CRUD Handlers
+  const openAddScheduleItemModal = () => {
+    const nextNum = activeScheduleList.length + 1;
+    const lastItem = activeScheduleList[activeScheduleList.length - 1];
+    let nextDate = new Date().toISOString().split('T')[0];
+    if (lastItem && lastItem.due_date) {
+      const d = new Date(lastItem.due_date);
+      d.setMonth(d.getMonth() + 1);
+      nextDate = d.toISOString().split('T')[0];
+    }
+    setEditingScheduleItem(null);
+    setScheduleItemForm({
+      installment_number: nextNum,
+      due_date: nextDate,
+      total_installment: activeScheduleDebt?.monthly_installment || "",
+      capital_part: activeScheduleDebt?.capital_installment || "",
+      interest_part: activeScheduleDebt?.interest_installment || "",
+      remaining_balance: "",
+      is_paid: false
+    });
+    setShowEditScheduleItemModal(true);
+  };
+
+  const openEditScheduleItemModal = (item) => {
+    setEditingScheduleItem(item);
+    setScheduleItemForm({
+      installment_number: item.installment_number,
+      due_date: item.due_date,
+      total_installment: item.total_installment,
+      capital_part: item.capital_part,
+      interest_part: item.interest_part,
+      remaining_balance: item.remaining_balance,
+      is_paid: item.is_paid
+    });
+    setShowEditScheduleItemModal(true);
+  };
+
+  const handleSaveScheduleItem = async (e) => {
+    e.preventDefault();
+    if (!activeScheduleDebt) return;
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const isEdit = Boolean(editingScheduleItem);
+      const url = isEdit
+        ? `${baseUrl}/api/debts/schedule/item/${editingScheduleItem.id}`
+        : `${baseUrl}/api/debts/${activeScheduleDebt.id}/schedule/item`;
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
+        body: JSON.stringify(scheduleItemForm)
+      });
+
+      if (res.ok) {
+        setShowEditScheduleItemModal(false);
+        setEditingScheduleItem(null);
+        openScheduleModal(activeScheduleDebt);
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteScheduleItem = async (scheduleId) => {
+    if (!window.confirm("Czy na pewno chcesz usunąć tę ratę z harmonogramu?")) return;
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${baseUrl}/api/debts/schedule/item/${scheduleId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${authData?.token}` }
+      });
+      if (res.ok) {
+        if (activeScheduleDebt) openScheduleModal(activeScheduleDebt);
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleClearSchedule = async () => {
+    if (!activeScheduleDebt) return;
+    if (!window.confirm(`Czy na pewno chcesz WYCZYŚCIĆ CAŁY HARMONOGRAM dla "${activeScheduleDebt.creditor}"?`)) return;
+
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${baseUrl}/api/debts/${activeScheduleDebt.id}/schedule`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${authData?.token}` }
+      });
+      if (res.ok) {
+        openScheduleModal(activeScheduleDebt);
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Generate Equal Installments
+  const openGenerateScheduleModal = () => {
+    if (!activeScheduleDebt) return;
+    setGenerateForm({
+      start_date: new Date().toISOString().split('T')[0],
+      months_count: 12,
+      monthly_total: activeScheduleDebt.monthly_installment || "",
+      capital_part: activeScheduleDebt.capital_installment || "",
+      interest_part: activeScheduleDebt.interest_installment || "",
+      due_day: activeScheduleDebt.due_day || 10,
+      initial_debt: activeScheduleDebt.total_amount || ""
+    });
+    setShowGenerateScheduleModal(true);
+  };
+
+  const handleGenerateScheduleSubmit = async (e) => {
+    e.preventDefault();
+    if (!activeScheduleDebt) return;
+
+    const count = parseInt(generateForm.months_count, 10) || 12;
+    const monthly = parseFloat(generateForm.monthly_total) || 0;
+    const cap = parseFloat(generateForm.capital_part) || monthly;
+    const intVal = parseFloat(generateForm.interest_part) || 0;
+    let balance = parseFloat(generateForm.initial_debt) || 0;
+    const dueDay = parseInt(generateForm.due_day, 10) || 10;
+
+    const generated = [];
+    const startDate = new Date(generateForm.start_date);
+
+    for (let i = 1; i <= count; i++) {
+      const d = new Date(startDate.getFullYear(), startDate.getMonth() + (i - 1), Math.min(dueDay, 28));
+      const dateStr = d.toISOString().split('T')[0];
+      balance = Math.max(0, balance - cap);
+
+      generated.push({
+        installment_number: i,
+        due_date: dateStr,
+        total_installment: monthly,
+        capital_part: cap,
+        interest_part: intVal,
+        remaining_balance: balance,
+        is_paid: false
+      });
+    }
+
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${baseUrl}/api/debts/${activeScheduleDebt.id}/schedule/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
+        body: JSON.stringify({
+          items: generated,
+          replace_existing: true
+        })
+      });
+
+      if (res.ok) {
+        setShowGenerateScheduleModal(false);
+        openScheduleModal(activeScheduleDebt);
+        fetchData();
       }
     } catch (err) {
       console.error(err);
@@ -1037,6 +1456,12 @@ export default function DebtsManagement() {
                           </td>
                           <td data-label="Akcje" className="text-center">
                             <div className="actions-cell-inline">
+                              <button className="btn-icon" onClick={() => {
+                                setScheduleFilter(Number(d.total_schedule_count) > 0 ? "unpaid" : "all");
+                                openScheduleModal(d);
+                              }} title="Harmonogram spłat">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                              </button>
                               <button className="btn-icon" onClick={() => openEditModal(d)} title="Edytuj">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                               </button>
@@ -1111,16 +1536,18 @@ export default function DebtsManagement() {
                       </td>
                       <td data-label="Kapitał" className="text-right col-amount">{formatPLN(d.total_amount)}</td>
                       <td data-label="Harmonogram" className="text-center">
-                        {Number(d.total_schedule_count) > 0 ? (
-                          <button className="btn-small" onClick={() => {
-                            setScheduleFilter("unpaid");
+                        <button
+                          className={`btn-small ${Number(d.total_schedule_count) > 0 ? '' : 'primary'}`}
+                          onClick={() => {
+                            setScheduleFilter(Number(d.total_schedule_count) > 0 ? "unpaid" : "all");
                             openScheduleModal(d);
-                          }}>
-                            Harmonogram ({d.unpaid_schedule_count} rat pozostało)
-                          </button>
-                        ) : (
-                          <span className="check-sub">-</span>
-                        )}
+                          }}
+                        >
+                          {Number(d.total_schedule_count) > 0
+                            ? `Harmonogram (${d.unpaid_schedule_count || 0} rat)`
+                            : `+ Harmonogram`
+                          }
+                        </button>
                       </td>
                       <td data-label="Akcje" className="text-center">
                         <div className="actions-cell-inline">
@@ -1413,6 +1840,30 @@ export default function DebtsManagement() {
               <button className="btn-icon" onClick={() => setShowScheduleModal(false)}>✕</button>
             </div>
 
+            {/* Action Bar for Schedule Controls */}
+            <div className="schedule-action-bar">
+              <div className="schedule-action-buttons">
+                <button className="btn btn-primary btn-sm" onClick={() => {
+                  setImportRawInput("");
+                  setParsedImportList([]);
+                  setShowImportScheduleModal(true);
+                }}>
+                  📥 Importuj
+                </button>
+                <button className="btn btn-secondary-outline btn-sm" onClick={openGenerateScheduleModal}>
+                  ⚡ Generuj
+                </button>
+                <button className="btn btn-secondary-outline btn-sm" onClick={openAddScheduleItemModal}>
+                  + Dodaj Ratę
+                </button>
+              </div>
+              {activeScheduleList.length > 0 && (
+                <button className="btn btn-sm" style={{ background: '#ef4444', color: '#fff', border: 'none' }} onClick={handleClearSchedule}>
+                  🗑️ Wyczyść
+                </button>
+              )}
+            </div>
+
             <div className="table-responsive schedule-table-container">
               <table className="minimal-table">
                 <thead>
@@ -1424,31 +1875,51 @@ export default function DebtsManagement() {
                     <th className="text-right">Spłata Kapitału</th>
                     <th className="text-right">W tym Odsetki</th>
                     <th className="text-right">Pozostały Dług</th>
+                    <th className="text-center" style={{ width: 70 }}>Akcje</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(scheduleFilter === 'unpaid'
-                    ? activeScheduleList.filter(s => !s.is_paid)
-                    : activeScheduleList
-                  ).map(s => (
-                    <tr key={s.id} className={s.is_paid ? 'is-done' : ''}>
-                      <td className="text-center col-bold">#{s.installment_number}</td>
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(s.is_paid)}
-                          onChange={() => handleToggleScheduleItem(s.id)}
-                          className="custom-checkbox"
-                          title="Zaznaczenie odejmuje kapitał i zaktualizuje salda długu"
-                        />
+                  {activeScheduleList.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="text-center" style={{ padding: '30px 15px' }}>
+                        Brak rat w harmonogramie dla tego długu.<br/>
+                        <span className="check-sub">Kliknij <strong>"📥 Importuj"</strong> aby wkleić tabelę z banku/wygenerowaną przez AI lub <strong>"⚡ Generuj Raty"</strong>.</span>
                       </td>
-                      <td className="text-center">{s.due_date}</td>
-                      <td className="text-right col-bold">{formatPLN(s.total_installment)}</td>
-                      <td className="text-right" style={{ color: '#10b981', fontWeight: 600 }}>{formatPLN(s.capital_part)}</td>
-                      <td className="text-right" style={{ color: '#ef4444' }}>{formatPLN(s.interest_part)}</td>
-                      <td className="text-right col-amount">{formatPLN(s.remaining_balance)}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    (scheduleFilter === 'unpaid'
+                      ? activeScheduleList.filter(s => !s.is_paid)
+                      : activeScheduleList
+                    ).map(s => (
+                      <tr key={s.id} className={s.is_paid ? 'is-done' : ''}>
+                        <td className="text-center col-bold">#{s.installment_number}</td>
+                        <td className="text-center">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(s.is_paid)}
+                            onChange={() => handleToggleScheduleItem(s.id)}
+                            className="custom-checkbox"
+                            title="Zaznaczenie odejmuje kapitał i zaktualizuje salda długu"
+                          />
+                        </td>
+                        <td className="text-center">{s.due_date}</td>
+                        <td className="text-right col-bold">{formatPLN(s.total_installment)}</td>
+                        <td className="text-right" style={{ color: '#10b981', fontWeight: 600 }}>{formatPLN(s.capital_part)}</td>
+                        <td className="text-right" style={{ color: '#ef4444' }}>{formatPLN(s.interest_part)}</td>
+                        <td className="text-right col-amount">{formatPLN(s.remaining_balance)}</td>
+                        <td className="text-center">
+                          <div className="actions-cell-inline">
+                            <button className="btn-icon" onClick={() => openEditScheduleItemModal(s)} title="Edytuj ratę">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                            <button className="btn-icon delete" onClick={() => handleDeleteScheduleItem(s.id)} title="Usuń ratę">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1456,6 +1927,294 @@ export default function DebtsManagement() {
             <div className="modal-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setShowScheduleModal(false)}>Zamknij</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: IMPORT SCHEDULE (HTML, CSV, JSON, PASTE) */}
+      {showImportScheduleModal && activeScheduleDebt && (
+        <div className="debt-modal-overlay" onClick={() => setShowImportScheduleModal(false)}>
+          <div className="debt-modal-box schedule-modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-flex">
+              <div>
+                <h3>Import Harmonogramu Spłat — {activeScheduleDebt.creditor}</h3>
+                <span className="check-sub">Wklej kod HTML tabeli, CSV, JSON lub wgraj plik z wygenerowanym harmonogramem</span>
+              </div>
+              <button className="btn-icon" onClick={() => setShowImportScheduleModal(false)}>✕</button>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '14px' }}>
+              <label>Wgraj plik z dysku (.html, .csv, .json, .txt)</label>
+              <input
+                type="file"
+                accept=".html,.htm,.csv,.json,.txt"
+                onChange={handleFileUpload}
+                className="form-input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Lub wklej tutaj zawartość harmonogramu (HTML, CSV, JSON, Tekst):</label>
+              <textarea
+                className="import-textarea"
+                placeholder="Wklej tutaj tabelę <table>...</table> z banku lub CSV (np. 1;2026-08-28;615.56;401.04;214.52;25249.43) lub dane od AI..."
+                value={importRawInput}
+                onChange={e => handleImportInputChange(e.target.value)}
+              />
+            </div>
+
+            {/* Interactive Preview Table */}
+            {parsedImportList.length > 0 && (
+              <div className="import-preview-box">
+                <div className="import-preview-header">
+                  <div>
+                    <strong>Podgląd Rozpoznanych Rat:</strong> <span className="badge-success">{parsedImportList.length} rat</span>
+                  </div>
+                  <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="checkbox"
+                      checked={replaceExistingSchedule}
+                      onChange={e => setReplaceExistingSchedule(e.target.checked)}
+                      className="custom-checkbox"
+                    />
+                    Zastąp dotychczasowy harmonogram
+                  </label>
+                </div>
+
+                <div className="table-responsive schedule-table-container" style={{ maxHeight: '250px' }}>
+                  <table className="minimal-table">
+                    <thead>
+                      <tr>
+                        <th className="text-center">Lp.</th>
+                        <th className="text-center">Termin</th>
+                        <th className="text-right">Rata</th>
+                        <th className="text-right">Kapitał</th>
+                        <th className="text-right">Odsetki</th>
+                        <th className="text-right">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedImportList.map((row, idx) => (
+                        <tr key={idx}>
+                          <td className="text-center col-bold">#{row.installment_number}</td>
+                          <td className="text-center">{row.due_date}</td>
+                          <td className="text-right col-bold">{formatPLN(row.total_installment)}</td>
+                          <td className="text-right" style={{ color: '#10b981' }}>{formatPLN(row.capital_part)}</td>
+                          <td className="text-right" style={{ color: '#ef4444' }}>{formatPLN(row.interest_part)}</td>
+                          <td className="text-right col-amount">{formatPLN(row.remaining_balance)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: '16px' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={parsedImportList.length === 0}
+                onClick={handleSaveImportedSchedule}
+              >
+                Zapisz Harmonogram ({parsedImportList.length} rat)
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowImportScheduleModal(false)}>
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: ADD / EDIT SINGLE SCHEDULE ITEM */}
+      {showEditScheduleItemModal && activeScheduleDebt && (
+        <div className="debt-modal-overlay" onClick={() => setShowEditScheduleItemModal(false)}>
+          <div className="debt-modal-box" onClick={e => e.stopPropagation()}>
+            <h3>{editingScheduleItem ? `Edytuj Ratę #${editingScheduleItem.installment_number}` : "Dodaj Nową Ratę do Harmonogramu"}</h3>
+            <form onSubmit={handleSaveScheduleItem}>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Numer Raty *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={scheduleItemForm.installment_number}
+                    onChange={e => setScheduleItemForm({ ...scheduleItemForm, installment_number: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Termin Spłaty *</label>
+                  <input
+                    type="date"
+                    required
+                    value={scheduleItemForm.due_date}
+                    onChange={e => setScheduleItemForm({ ...scheduleItemForm, due_date: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Kwota Całkowita Raty (zł) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="np. 615,56"
+                    value={scheduleItemForm.total_installment}
+                    onChange={e => {
+                      const tot = e.target.value;
+                      const cap = scheduleItemForm.capital_part;
+                      const intVal = (parseFloat(tot || 0) - parseFloat(cap || 0)).toFixed(2);
+                      setScheduleItemForm({
+                        ...scheduleItemForm,
+                        total_installment: tot,
+                        interest_part: intVal > 0 ? intVal : scheduleItemForm.interest_part
+                      });
+                    }}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Spłata Kapitału (zł)</label>
+                  <input
+                    type="text"
+                    placeholder="np. 401,04"
+                    value={scheduleItemForm.capital_part}
+                    onChange={e => setScheduleItemForm({ ...scheduleItemForm, capital_part: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Część Odsetkowa (zł)</label>
+                  <input
+                    type="text"
+                    placeholder="np. 214,52"
+                    value={scheduleItemForm.interest_part}
+                    onChange={e => setScheduleItemForm({ ...scheduleItemForm, interest_part: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Pozostałe Saldo Długu Po Racie (zł)</label>
+                  <input
+                    type="text"
+                    placeholder="np. 24633,87"
+                    value={scheduleItemForm.remaining_balance}
+                    onChange={e => setScheduleItemForm({ ...scheduleItemForm, remaining_balance: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '8px' }}>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(scheduleItemForm.is_paid)}
+                    onChange={e => setScheduleItemForm({ ...scheduleItemForm, is_paid: e.target.checked })}
+                    className="custom-checkbox"
+                  />
+                  Rata została już opłacona
+                </label>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '16px' }}>
+                <button type="submit" className="btn btn-primary">Zapisz Ratę</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditScheduleItemModal(false)}>Anuluj</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: GENERATE EQUAL INSTALLMENTS */}
+      {showGenerateScheduleModal && activeScheduleDebt && (
+        <div className="debt-modal-overlay" onClick={() => setShowGenerateScheduleModal(false)}>
+          <div className="debt-modal-box" onClick={e => e.stopPropagation()}>
+            <h3>Generuj Równe Raty Harmonogramu — {activeScheduleDebt.creditor}</h3>
+            <form onSubmit={handleGenerateScheduleSubmit}>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Liczba Miesięcy / Rat *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    max="120"
+                    value={generateForm.months_count}
+                    onChange={e => setGenerateForm({ ...generateForm, months_count: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Data Pierwszej Raty *</label>
+                  <input
+                    type="date"
+                    required
+                    value={generateForm.start_date}
+                    onChange={e => setGenerateForm({ ...generateForm, start_date: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Początkowy Kapitał Długu (zł)</label>
+                  <input
+                    type="text"
+                    value={generateForm.initial_debt}
+                    onChange={e => setGenerateForm({ ...generateForm, initial_debt: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Dzień Płatności w Miesiącu</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={generateForm.due_day}
+                    onChange={e => setGenerateForm({ ...generateForm, due_day: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Miesięczna Rata Całkowita (zł) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={generateForm.monthly_total}
+                    onChange={e => setGenerateForm({ ...generateForm, monthly_total: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>W tym Kapitał (zł)</label>
+                  <input
+                    type="text"
+                    value={generateForm.capital_part}
+                    onChange={e => setGenerateForm({ ...generateForm, capital_part: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '16px' }}>
+                <button type="submit" className="btn btn-primary">Wygeneruj {generateForm.months_count} Rat</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowGenerateScheduleModal(false)}>Anuluj</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
