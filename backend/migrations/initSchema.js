@@ -426,7 +426,7 @@ async function seedInitialDebts() {
         { creditor: "MAMA KREDYT", total: 6069.25, installment: 397.98, capital: 324.64, interest: 73.34, dueDay: 2 },
         { creditor: "MARCELA KREDYT", total: 8289.00, installment: 415.39, capital: 315.23, interest: 100.16, dueDay: 10 },
         { creditor: "Smartney", total: 15000.00, installment: 615.56, capital: 401.04, interest: 214.52, dueDay: 28 },
-        { creditor: "PKO BP kredyt", total: 31642.61, installment: 691.52, capital: 302.27, interest: 389.25, dueDay: 15 },
+        { creditor: "PKO BP kredyt", total: 32332.61, installment: 691.52, capital: 302.27, interest: 389.25, dueDay: 15 },
         { creditor: "Mama", total: 1200.00, installment: 0.00, capital: 0.00, interest: 0.00, dueDay: null }
       ];
 
