@@ -6,6 +6,7 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("robocza");
   const [validUntil, setValidUntil] = useState("");
+  const [createdAt, setCreatedAt] = useState(() => new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [warranty, setWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe.");
   const [validityText, setValidityText] = useState(() => localStorage.getItem("default_offer_validity") || "30 dni od daty wystawienia");
@@ -35,6 +36,12 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
             if (data.warranty !== undefined && data.warranty !== null) setWarranty(data.warranty);
             if (data.validity_text !== undefined && data.validity_text !== null) setValidityText(data.validity_text);
             
+            if (data.created_at) {
+              const d = new Date(data.created_at);
+              const formattedCreated = d.toISOString().split("T")[0];
+              setCreatedAt(formattedCreated);
+            }
+
             if (data.valid_until) {
               // Format date as YYYY-MM-DD
               const d = new Date(data.valid_until);
@@ -141,6 +148,7 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
         title,
         description,
         status,
+        created_at: createdAt === "" ? null : createdAt,
         valid_until: validUntil === "" ? null : validUntil,
         notes,
         warranty,
@@ -226,6 +234,16 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
             value={title}
             onChange={e => setTitle(e.target.value)}
             required
+          />
+        </div>
+
+        <div className="form-group" style={{ flex: 1 }}>
+          <label>Data wystawienia</label>
+          <input
+            type="date"
+            className="form-input"
+            value={createdAt}
+            onChange={e => setCreatedAt(e.target.value)}
           />
         </div>
 

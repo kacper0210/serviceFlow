@@ -65,7 +65,7 @@ router.get("/:id", checkAuth, asyncHandler(async (req, res) => {
 
 // POST /api/offers
 router.post("/", checkAuth, asyncHandler(async (req, res) => {
-  const { client_id, title, description, status, valid_until, notes, total_net, total_vat, total_gross, items, warranty, validity_text } = req.body;
+  const { client_id, title, description, status, valid_until, created_at, notes, total_net, total_vat, total_gross, items, warranty, validity_text } = req.body;
   
   const client = await pool.connect();
   try {
@@ -83,19 +83,21 @@ router.post("/", checkAuth, asyncHandler(async (req, res) => {
     }
 
     const offerNumber = `OFR/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
+    const issueDate = created_at ? created_at : new Date();
     
     const offerRes = await client.query(
       `INSERT INTO offers (
-         client_id, title, description, status, valid_until, notes, 
+         client_id, title, description, status, valid_until, created_at, notes, 
          total_net, total_vat, total_gross, offer_number, client_name, client_nip,
          warranty, validity_text
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
       [
         client_id ? parseInt(client_id) : null,
         title || 'Nowa oferta',
         description || '',
         status || 'robocza',
         valid_until || null,
+        issueDate,
         notes || '',
         total_net || 0,
         total_vat || 0,
@@ -150,17 +152,24 @@ router.post("/", checkAuth, asyncHandler(async (req, res) => {
 // PUT /api/offers/:id
 router.put("/:id", checkAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { client_id, title, description, status, valid_until, notes, total_net, total_vat, total_gross, items, warranty, validity_text } = req.body;
+  const { client_id, title, description, status, valid_until, created_at, notes, total_net, total_vat, total_gross, items, warranty, validity_text } = req.body;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     
-    const offerRes = await client.query(
-      `UPDATE offers SET client_id = $1, title = $2, description = $3, status = $4, valid_until = $5, notes = $6, total_net = $7, total_vat = $8, total_gross = $9, warranty = $10, validity_text = $11, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $12 RETURNING *`,
-      [client_id ? parseInt(client_id) : null, title, description, status, valid_until || null, notes, total_net || 0, total_vat || 0, total_gross || 0, warranty || null, validity_text || null, id]
-    );
+    let updateQuery = `UPDATE offers SET client_id = $1, title = $2, description = $3, status = $4, valid_until = $5, notes = $6, total_net = $7, total_vat = $8, total_gross = $9, warranty = $10, validity_text = $11, updated_at = CURRENT_TIMESTAMP`;
+    let queryParams = [client_id ? parseInt(client_id) : null, title, description, status, valid_until || null, notes, total_net || 0, total_vat || 0, total_gross || 0, warranty || null, validity_text || null];
+
+    if (created_at) {
+      queryParams.push(created_at);
+      updateQuery += `, created_at = $${queryParams.length}`;
+    }
+
+    queryParams.push(id);
+    updateQuery += ` WHERE id = $${queryParams.length} RETURNING *`;
+
+    const offerRes = await client.query(updateQuery, queryParams);
     
     if (offerRes.rows.length === 0) {
       await client.query('ROLLBACK');
