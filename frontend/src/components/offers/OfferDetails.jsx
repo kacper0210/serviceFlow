@@ -265,10 +265,10 @@ export default function OfferDetails({ offerId, onClose, onConverted }) {
               
               <div className="conditions-grid">
                 <div className="condition-item">
-                  <strong>Gwarancja:</strong> 24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe.
+                  <strong>Gwarancja:</strong> {offer.warranty || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe."}
                 </div>
                 <div className="condition-item">
-                  <strong>Ważność oferty:</strong> {offer.valid_until ? formatDate(offer.valid_until) : "30 dni od daty wystawienia"}.
+                  <strong>Ważność oferty:</strong> {offer.validity_text || (offer.valid_until ? formatDate(offer.valid_until) : "30 dni od daty wystawienia")}.
                 </div>
               </div>
             </div>
@@ -285,7 +285,7 @@ export default function OfferDetails({ offerId, onClose, onConverted }) {
 
           <div className="footer">
             <div className="validity-note">
-              Oferta ważna do: {offer.valid_until ? formatDate(offer.valid_until) : "30 dni od daty wystawienia"}
+              Oferta ważna do: {offer.validity_text || (offer.valid_until ? formatDate(offer.valid_until) : "30 dni od daty wystawienia")}
             </div>
           </div>
 

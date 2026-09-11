@@ -89,6 +89,8 @@ async function ensureDbTablesExist() {
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_nip VARCHAR(50);
       ALTER TABLE offers ADD COLUMN IF NOT EXISTS client_address TEXT;
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS warranty TEXT;
+      ALTER TABLE offers ADD COLUMN IF NOT EXISTS validity_text TEXT;
     `, "offers");
 
     await safeQuery(`

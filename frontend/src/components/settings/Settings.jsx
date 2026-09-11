@@ -23,9 +23,18 @@ export default function Settings() {
     refreshLogs();
   }, []);
 
+  const [defaultWarranty, setDefaultWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe.");
+  const [defaultValidity, setDefaultValidity] = useState(() => localStorage.getItem("default_offer_validity") || "30 dni od daty wystawienia");
+
   const saveBasics = () => {
     localStorage.setItem("company_name", companyName);
     alert("Zapisano nazwę firmy!");
+  };
+
+  const saveOfferTemplate = () => {
+    localStorage.setItem("default_offer_warranty", defaultWarranty);
+    localStorage.setItem("default_offer_validity", defaultValidity);
+    alert("Zapisano domyślny szablon ofert!");
   };
 
   const toggleTheme = () => {
@@ -124,6 +133,27 @@ export default function Settings() {
             placeholder="np. Serwis Komputerowy"
           />
           <button className="btn btn-primary" onClick={saveBasics}>Zapisz</button>
+        </div>
+
+        <div className="settings-card">
+          <h2 className="settings-title">Domyślny Szablon Oferty</h2>
+          <label className="settings-label">Domyślna gwarancja</label>
+          <textarea
+            className="settings-input"
+            value={defaultWarranty}
+            onChange={(e) => setDefaultWarranty(e.target.value)}
+            placeholder="Treść gwarancji..."
+            style={{ minHeight: '60px', marginBottom: '10px' }}
+          />
+          <label className="settings-label">Domyślna ważność oferty</label>
+          <input
+            className="settings-input"
+            value={defaultValidity}
+            onChange={(e) => setDefaultValidity(e.target.value)}
+            placeholder="np. 30 dni od daty wystawienia"
+            style={{ marginBottom: '15px' }}
+          />
+          <button className="btn btn-primary" onClick={saveOfferTemplate}>Zapisz szablon</button>
         </div>
 
         <div className="settings-card">

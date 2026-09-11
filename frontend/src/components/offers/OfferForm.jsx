@@ -7,6 +7,8 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
   const [status, setStatus] = useState("robocza");
   const [validUntil, setValidUntil] = useState("");
   const [notes, setNotes] = useState("");
+  const [warranty, setWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe.");
+  const [validityText, setValidityText] = useState(() => localStorage.getItem("default_offer_validity") || "30 dni od daty wystawienia");
   const [loading, setLoading] = useState(false);
 
   const [items, setItems] = useState([
@@ -30,6 +32,8 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
             setDescription(data.description || "");
             setStatus(data.status || "robocza");
             setNotes(data.notes || "");
+            if (data.warranty !== undefined && data.warranty !== null) setWarranty(data.warranty);
+            if (data.validity_text !== undefined && data.validity_text !== null) setValidityText(data.validity_text);
             
             if (data.valid_until) {
               // Format date as YYYY-MM-DD
@@ -139,6 +143,8 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
         status,
         valid_until: validUntil === "" ? null : validUntil,
         notes,
+        warranty,
+        validity_text: validityText,
         total_net: totalNet,
         total_vat: totalVat,
         total_gross: totalGross,
@@ -379,11 +385,37 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
         <label>Warunki dodatkowe / Uwagi</label>
         <textarea
           className="form-textarea"
-          placeholder="np. Sposób płatności, czas realizacji zlecenia, warunki gwarancji..."
+          placeholder="np. Sposób płatności, czas realizacji zlecenia..."
           value={notes}
           onChange={e => setNotes(e.target.value)}
           style={{ minHeight: '70px' }}
         />
+      </div>
+
+      <div style={{ background: 'var(--bg-card, rgba(255,255,255,0.03))', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <h4 style={{ margin: '0 0 5px 0', fontSize: '0.95rem', color: 'var(--text-main)' }}>Warunki szablonu (Gwarancja i Ważność)</h4>
+        
+        <div className="form-group" style={{ margin: 0 }}>
+          <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Gwarancja</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="np. 24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe."
+            value={warranty}
+            onChange={e => setWarranty(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group" style={{ margin: 0 }}>
+          <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Tekst ważności oferty</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="np. 30 dni od daty wystawienia"
+            value={validityText}
+            onChange={e => setValidityText(e.target.value)}
+          />
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '15px', marginTop: '10px' }}>
