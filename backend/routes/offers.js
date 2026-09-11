@@ -105,8 +105,8 @@ router.post("/", checkAuth, asyncHandler(async (req, res) => {
         offerNumber,
         clientName || 'Klient',
         clientNip || '',
-        warranty || null,
-        validity_text || null
+        warranty !== undefined && warranty !== null ? warranty : '',
+        validity_text !== undefined && validity_text !== null ? validity_text : ''
       ]
     );
     const offer = offerRes.rows[0];
@@ -159,7 +159,19 @@ router.put("/:id", checkAuth, asyncHandler(async (req, res) => {
     await client.query('BEGIN');
     
     let updateQuery = `UPDATE offers SET client_id = $1, title = $2, description = $3, status = $4, valid_until = $5, notes = $6, total_net = $7, total_vat = $8, total_gross = $9, warranty = $10, validity_text = $11, updated_at = CURRENT_TIMESTAMP`;
-    let queryParams = [client_id ? parseInt(client_id) : null, title, description, status, valid_until || null, notes, total_net || 0, total_vat || 0, total_gross || 0, warranty || null, validity_text || null];
+    let queryParams = [
+      client_id ? parseInt(client_id) : null,
+      title,
+      description,
+      status,
+      valid_until || null,
+      notes,
+      total_net || 0,
+      total_vat || 0,
+      total_gross || 0,
+      warranty !== undefined && warranty !== null ? warranty : '',
+      validity_text !== undefined && validity_text !== null ? validity_text : ''
+    ];
 
     if (created_at) {
       queryParams.push(created_at);

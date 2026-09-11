@@ -254,25 +254,31 @@ export default function OfferDetails({ offerId, onClose, onConverted }) {
             </div>
           </div>
 
-          <div className="section">
-            <div className="section-title">Specyfikacja urządzeń i warunki realizacji</div>
-            <div className="tech-box">
-              {offer.notes ? (
-                <div style={{ whiteSpace: 'pre-wrap', marginBottom: '8px' }}>{offer.notes}</div>
-              ) : (
-                <div style={{ marginBottom: '8px' }}>Wszelkie materiały i urządzenia zostaną dostarczone oraz zamontowane zgodnie ze sztuką monterską.</div>
-              )}
-              
-              <div className="conditions-grid">
-                <div className="condition-item">
-                  <strong>Gwarancja:</strong> {offer.warranty || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe."}
-                </div>
-                <div className="condition-item">
-                  <strong>Ważność oferty:</strong> {offer.validity_text || (offer.valid_until ? formatDate(offer.valid_until) : "30 dni od daty wystawienia")}.
-                </div>
+          {((offer.notes && offer.notes.trim()) || (offer.warranty && offer.warranty.trim()) || (offer.validity_text && offer.validity_text.trim()) || offer.valid_until) ? (
+            <div className="section">
+              <div className="section-title">Specyfikacja urządzeń i warunki realizacji</div>
+              <div className="tech-box">
+                {offer.notes && offer.notes.trim() ? (
+                  <div style={{ whiteSpace: 'pre-wrap', marginBottom: '8px' }}>{offer.notes}</div>
+                ) : null}
+                
+                {((offer.warranty && offer.warranty.trim()) || (offer.validity_text && offer.validity_text.trim()) || offer.valid_until) ? (
+                  <div className="conditions-grid">
+                    {offer.warranty && offer.warranty.trim() ? (
+                      <div className="condition-item">
+                        <strong>Gwarancja:</strong> {offer.warranty}
+                      </div>
+                    ) : null}
+                    {(offer.validity_text && offer.validity_text.trim()) || offer.valid_until ? (
+                      <div className="condition-item">
+                        <strong>Ważność oferty:</strong> {offer.validity_text && offer.validity_text.trim() ? offer.validity_text : formatDate(offer.valid_until)}.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="signatures-section">
             <div className="signature-box vendor">
@@ -284,9 +290,11 @@ export default function OfferDetails({ offerId, onClose, onConverted }) {
           </div>
 
           <div className="footer">
-            <div className="validity-note">
-              Oferta ważna do: {offer.validity_text || (offer.valid_until ? formatDate(offer.valid_until) : "30 dni od daty wystawienia")}
-            </div>
+            {(offer.validity_text && offer.validity_text.trim()) || offer.valid_until ? (
+              <div className="validity-note">
+                Oferta ważna do: {offer.validity_text && offer.validity_text.trim() ? offer.validity_text : formatDate(offer.valid_until)}
+              </div>
+            ) : null}
           </div>
 
         </div>

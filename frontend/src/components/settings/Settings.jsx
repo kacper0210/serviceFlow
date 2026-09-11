@@ -23,8 +23,8 @@ export default function Settings() {
     refreshLogs();
   }, []);
 
-  const [defaultWarranty, setDefaultWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe.");
-  const [defaultValidity, setDefaultValidity] = useState(() => localStorage.getItem("default_offer_validity") || "30 dni od daty wystawienia");
+  const [defaultWarranty, setDefaultWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "");
+  const [defaultValidity, setDefaultValidity] = useState(() => localStorage.getItem("default_offer_validity") || "");
 
   const saveBasics = () => {
     localStorage.setItem("company_name", companyName);

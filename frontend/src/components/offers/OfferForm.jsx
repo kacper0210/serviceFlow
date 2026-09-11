@@ -8,8 +8,8 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
   const [validUntil, setValidUntil] = useState("");
   const [createdAt, setCreatedAt] = useState(() => new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
-  const [warranty, setWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "24 miesiące na urządzenia (od dnia dostawy), 12 miesięcy na prace montażowe.");
-  const [validityText, setValidityText] = useState(() => localStorage.getItem("default_offer_validity") || "30 dni od daty wystawienia");
+  const [warranty, setWarranty] = useState(() => localStorage.getItem("default_offer_warranty") || "");
+  const [validityText, setValidityText] = useState(() => localStorage.getItem("default_offer_validity") || "");
   const [loading, setLoading] = useState(false);
 
   const [items, setItems] = useState([
@@ -33,8 +33,8 @@ export default function OfferForm({ offer, clients, onCancel, onSaved }) {
             setDescription(data.description || "");
             setStatus(data.status || "robocza");
             setNotes(data.notes || "");
-            if (data.warranty !== undefined && data.warranty !== null) setWarranty(data.warranty);
-            if (data.validity_text !== undefined && data.validity_text !== null) setValidityText(data.validity_text);
+            setWarranty(data.warranty !== undefined && data.warranty !== null ? data.warranty : "");
+            setValidityText(data.validity_text !== undefined && data.validity_text !== null ? data.validity_text : "");
             
             if (data.created_at) {
               const d = new Date(data.created_at);
