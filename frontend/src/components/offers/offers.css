@@ -246,15 +246,31 @@ body.dark-mode .page {
   vertical-align: middle;
 }
 
-/* Definicja szerokości kolumn */
-.page .col-name { width: 30%; text-align: left !important; white-space: normal !important; padding-left: 2px !important; }
-.page .col-price { width: 11%; }
-.page .col-vat { width: 9%; }
-.page .col-gross { width: 11%; }
-.page .col-qty { width: 8%; text-align: center !important; }
-.page .col-tot-net { width: 11%; }
-.page .col-tot-vat { width: 9%; }
-.page .col-tot-gross { width: 11%; }
+/* Definicja szerokości kolumn i zawijanie tekstu w nazwie pozycji */
+.page table.cost-table th.col-name,
+.page table.cost-table td.col-name { 
+  width: 30%; 
+  text-align: left !important; 
+  white-space: normal !important; 
+  word-break: break-word !important; 
+  overflow-wrap: break-word !important; 
+  padding-left: 4px !important; 
+}
+
+.page table.cost-table th.col-name *,
+.page table.cost-table td.col-name * { 
+  white-space: normal !important; 
+  word-break: break-word !important; 
+  overflow-wrap: break-word !important; 
+}
+
+.page table.cost-table th.col-price, .page table.cost-table td.col-price { width: 11%; }
+.page table.cost-table th.col-vat, .page table.cost-table td.col-vat { width: 8%; }
+.page table.cost-table th.col-gross, .page table.cost-table td.col-gross { width: 11%; }
+.page table.cost-table th.col-qty, .page table.cost-table td.col-qty { width: 8%; text-align: center !important; }
+.page table.cost-table th.col-tot-net, .page table.cost-table td.col-tot-net { width: 11%; }
+.page table.cost-table th.col-tot-vat, .page table.cost-table td.col-tot-vat { width: 9%; }
+.page table.cost-table th.col-tot-gross, .page table.cost-table td.col-tot-gross { width: 12%; }
 
 .page table.cost-table tr.total-row td { 
   border-top: 2px solid #111827 !important; 
