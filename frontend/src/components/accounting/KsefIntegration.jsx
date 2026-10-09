@@ -147,6 +147,8 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
     }
   };
 
+  const [debugLogs, setDebugLogs] = useState([]);
+
   const handleSyncKsef = async (customLimit = null) => {
     setSyncing(true);
     setErrorMessage("");
@@ -163,6 +165,9 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
         body: JSON.stringify(payload)
       });
       const data = await res.json();
+      if (data.debug_logs) {
+        setDebugLogs(data.debug_logs);
+      }
       if (res.ok) {
         setInvoices(data.invoices || []);
         if (data.last_sync_at) setLastSyncAt(data.last_sync_at);
@@ -535,6 +540,53 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
             </button>
           </div>
         </div>
+
+        {/* Audit Log Toggle & Panel */}
+        {debugLogs.length > 0 && (
+          <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px dashed var(--border-color)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-main)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                🔍 Audyt zapytań HTTP do KSeF API 2.0 (ostatnia próba: {debugLogs.length} kroków)
+              </span>
+              <button
+                type="button"
+                onClick={() => setDebugLogs([])}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  fontSize: "0.75rem",
+                  cursor: "pointer",
+                  textDecoration: "underline"
+                }}
+              >
+                Wyczyść dziennik
+              </button>
+            </div>
+            <div 
+              style={{
+                marginTop: "8px",
+                background: "#0f172a",
+                color: "#38bdf8",
+                fontFamily: "monospace",
+                fontSize: "0.78rem",
+                padding: "12px",
+                borderRadius: "6px",
+                maxHeight: "180px",
+                overflowY: "auto",
+                border: "1px solid #1e293b",
+                whiteSpace: "pre-wrap",
+                lineHeight: "1.4"
+              }}
+            >
+              {debugLogs.map((logLine, idx) => (
+                <div key={idx} style={{ color: logLine.includes("429") || logLine.includes("ERROR") ? "#f87171" : logLine.includes("Status 200") ? "#4ade80" : "#e2e8f0" }}>
+                  {logLine}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Settings Modal */}

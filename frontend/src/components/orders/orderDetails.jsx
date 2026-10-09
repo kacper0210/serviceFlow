@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./orders.css";
 
-export default function OrderDetails({ orderId, onClose }) {
+export default function OrderDetails({ orderId, onClose, onOrderUpdated }) {
   const [order, setOrder] = useState(null);
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +83,7 @@ export default function OrderDetails({ orderId, onClose }) {
         setCostAmount("");
         setCostTitle("");
         fetchCosts();
+        if (onOrderUpdated) onOrderUpdated(updatedOrder);
       }
     } catch (err) {
       console.error(err);
@@ -115,6 +116,7 @@ export default function OrderDetails({ orderId, onClose }) {
         setOrder(updatedOrder);
         setEditingCostId(null);
         fetchCosts();
+        if (onOrderUpdated) onOrderUpdated(updatedOrder);
       }
     } catch (err) {
       console.error(err);
@@ -136,6 +138,7 @@ export default function OrderDetails({ orderId, onClose }) {
         const updatedOrder = await res.json();
         setOrder(updatedOrder);
         fetchCosts();
+        if (onOrderUpdated) onOrderUpdated(updatedOrder);
       }
     } catch (err) {
       console.error(err);

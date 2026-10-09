@@ -283,27 +283,135 @@ export default function OrdersList() {
     });
   }, [filteredOrders, sortField, sortDirection, getClientDisplayName]);
 
+  // Sum earnings for active orders in progress ("w realizacji")
+  const activeOrdersMetrics = useMemo(() => {
+    const inProgressList = orders.filter(o => {
+      const st = (o.status || "").toLowerCase();
+      return st === "in_progress" || st === "w_trakcie" || st === "w realizacji";
+    });
+
+    const totalRevenue = inProgressList.reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
+    const totalCosts = inProgressList.reduce((sum, o) => sum + (parseFloat(o.total_costs) || 0), 0);
+    const totalProfit = totalRevenue - totalCosts;
+
+    return {
+      count: inProgressList.length,
+      revenue: totalRevenue,
+      costs: totalCosts,
+      profit: totalProfit
+    };
+  }, [orders]);
+
   return (
     <div className="orders-container">
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)', paddingBottom: '10px' }}>
-        <button 
-          className={`btn ${activeTab === 'list' ? 'btn-primary' : 'btn-secondary-outline'}`} 
-          onClick={() => setActiveTab('list')}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)', paddingBottom: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className={`btn ${activeTab === 'list' ? 'btn-primary' : 'btn-secondary-outline'}`} 
+            onClick={() => setActiveTab('list')}
+          >
+            📝 Lista Zleceń
+          </button>
+          <button 
+            className={`btn ${activeTab === 'profits' ? 'btn-primary' : 'btn-secondary-outline'}`} 
+            onClick={() => setActiveTab('profits')}
+          >
+            📈 Dochody z palca na wykres
+          </button>
+        </div>
+
+        {/* Compact Inline "W Realizacji" Profit Badge */}
+        <div 
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            color: '#b45309',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontSize: '0.85rem',
+            fontWeight: 600
+          }}
+          title={`Przychód: ${activeOrdersMetrics.revenue.toFixed(2)} zł | Koszty: ${activeOrdersMetrics.costs.toFixed(2)} zł`}
         >
-          📝 Lista Zleceń
-        </button>
-        <button 
-          className={`btn ${activeTab === 'profits' ? 'btn-primary' : 'btn-secondary-outline'}`} 
-          onClick={() => setActiveTab('profits')}
-        >
-          📈 Dochody z palca na wykres
-        </button>
+          <span>⏳ W realizacji ({activeOrdersMetrics.count}):</span>
+          <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#92400e' }}>
+            +{activeOrdersMetrics.profit.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+          </span>
+        </div>
       </div>
 
       {activeTab === 'profits' && <ManualProfitsView />}
 
       {activeTab === 'list' && (
         <>
+
+          {/* Month Segregation Navigation Bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            overflowX: 'auto',
+            paddingBottom: '8px',
+            marginBottom: '16px'
+          }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              Podział na miesiące:
+            </span>
+            <button
+              type="button"
+              onClick={() => { setFilterMonth(""); setCurrentPage(1); }}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: filterMonth === "" ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                background: filterMonth === "" ? 'var(--primary-color)' : 'var(--bg-card)',
+                color: filterMonth === "" ? '#fff' : 'var(--text-main)',
+                fontSize: '0.85rem',
+                fontWeight: filterMonth === "" ? 700 : 500,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Wszystkie ({orders.length})
+            </button>
+
+            {availableMonths.map(m => {
+              const countForMonth = orders.filter(o => {
+                const dateStr = o.deadline || o.created_at;
+                if (!dateStr) return false;
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return false;
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === m.key;
+              }).length;
+
+              const isActive = filterMonth === m.key;
+
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => { setFilterMonth(m.key); setCurrentPage(1); }}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: isActive ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                    background: isActive ? 'var(--primary-color)' : 'var(--bg-card)',
+                    color: isActive ? '#fff' : 'var(--text-main)',
+                    fontSize: '0.85rem',
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  📅 {m.label} ({countForMonth})
+                </button>
+              );
+            })}
+          </div>
+
           {/* Express 1-Click Quick Add Order Bar */}
           <form onSubmit={handleQuickAddOrder} style={{
             display: 'flex',
@@ -664,7 +772,13 @@ export default function OrdersList() {
       )}
 
       {detailsId && (
-        <OrderDetails orderId={detailsId} onClose={() => setDetailsId(null)} />
+        <OrderDetails
+          orderId={detailsId}
+          onClose={() => setDetailsId(null)}
+          onOrderUpdated={(updated) => {
+            setOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o));
+          }}
+        />
       )}
 
         </>

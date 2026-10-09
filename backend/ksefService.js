@@ -7,6 +7,22 @@ const KSEF_ENCRYPTION_KEY = process.env.KSEF_ENCRYPTION_KEY || '9a3b8c6e2d1f4a5b
 // In-memory session cache for KSeF 2.0 tokens (fast lookup fallback)
 const sessionCache = new Map();
 
+// In-memory Public Key Certificate Cache (cached for 24h to avoid hitting 1/hour cert limit)
+const certCache = new Map();
+const certCacheExpires = new Map();
+
+// HTTP Request Audit Counter & Detailed Debug Logger
+let totalKsefHttpRequests = 0;
+let lastSyncLogs = [];
+
+function getLastSyncLogs() {
+  return lastSyncLogs;
+}
+
+function clearSyncLogs() {
+  lastSyncLogs = [];
+}
+
 /**
  * Encrypts a token using AES-256-GCM.
  */
@@ -52,12 +68,34 @@ function decryptToken(encryptedToken, ivHex, tagHex) {
 }
 
 /**
- * Wrapper around fetch with exponential backoff retry for HTTP 429 Rate Limits.
+ * Wrapper around fetch with exponential backoff retry for HTTP 429 Rate Limits and detailed step-by-step HTTP logging.
  */
 async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+  totalKsefHttpRequests++;
+  const reqNum = totalKsefHttpRequests;
+  const method = options.method || 'GET';
+  const startTime = Date.now();
+  const endpointPath = url.replace(/https?:\/\/[^\/]+/, '');
+
+  console.log(`[KSeF HTTP #${reqNum}] START ${method} ${endpointPath}`);
+
   let attempt = 0;
   while (attempt <= maxRetries) {
-    const res = await fetch(url, options);
+    let res;
+    try {
+      res = await fetch(url, options);
+    } catch (fetchErr) {
+      const errLog = `[KSeF HTTP #${reqNum}] NETWORK ERROR on ${method} ${endpointPath}: ${fetchErr.message}`;
+      console.error(errLog);
+      lastSyncLogs.push(errLog);
+      throw fetchErr;
+    }
+
+    const duration = Date.now() - startTime;
+    const logLine = `[KSeF HTTP #${reqNum}] ${method} ${endpointPath} -> Status ${res.status} (${duration}ms)`;
+    console.log(logLine);
+    lastSyncLogs.push(logLine);
+
     if (res.status === 429) {
       attempt++;
       const retryAfterHeader = res.headers.get('retry-after');
@@ -80,12 +118,12 @@ async function fetchWithRetry(url, options = {}, maxRetries = 3) {
       } catch (e) {}
 
       if (attempt <= maxRetries && waitSeconds <= 10) {
-        console.log(`[KSeF Rate Limit] HTTP 429 received (${detailMsg || waitSeconds + 's'}). Waiting ${(waitSeconds + 0.5)}s before retry ${attempt}/${maxRetries}...`);
+        console.log(`[KSeF HTTP #${reqNum}] ⚠️ HTTP 429 Rate Limit (${detailMsg || waitSeconds + 's'}). Waiting ${(waitSeconds + 0.5)}s before retry ${attempt}/${maxRetries}...`);
         await new Promise(r => setTimeout(r, Math.max(1.5, waitSeconds + 0.5) * 1000));
         continue;
       }
 
-      const msg = detailMsg || `Przekroczono limit zapytań KSeF (błąd HTTP 429). Odczekaj podany czas przed kolejną synchronizacją.`;
+      const msg = detailMsg || `Przekroczono limit zapytań KSeF (błąd HTTP 429 na ${endpointPath}). Odczekaj podany czas przed kolejną synchronizacją.`;
       const err = new Error(msg);
       err.retryAfter = waitSeconds;
       err.status = 429;
@@ -279,18 +317,28 @@ async function authenticateKSeF(nip, token, env, pool = null) {
   
   const { challenge, timestamp } = await challengeRes.json();
   
-  // Step 2: Get KSeF Public Key Certificates
-  const certsRes = await fetchWithRetry(`${apiUrl}/security/public-key-certificates`);
-  if (!certsRes.ok) {
-    throw new Error(`Failed to fetch KSeF public certificates (${certsRes.status})`);
-  }
-  
-  const certsData = await certsRes.json();
-  let certBase64 = null;
-  if (Array.isArray(certsData)) {
-    certBase64 = certsData[0]?.certificate;
-  } else if (certsData && certsData.publicKeyCertificatesList) {
-    certBase64 = certsData.publicKeyCertificatesList[0]?.certificate;
+  // Step 2: Get KSeF Public Key Certificates (cached for 24h to prevent hitting 1/hour MF cert limit!)
+  let certBase64 = certCache.get(env);
+  if (!certBase64 || (certCacheExpires.get(env) || 0) < Date.now()) {
+    console.log(`[KSeF Cert Cache] Fetching fresh public key certificate from KSeF (${env})...`);
+    const certsRes = await fetchWithRetry(`${apiUrl}/security/public-key-certificates`);
+    if (!certsRes.ok) {
+      throw new Error(`Failed to fetch KSeF public certificates (${certsRes.status})`);
+    }
+    
+    const certsData = await certsRes.json();
+    if (Array.isArray(certsData)) {
+      certBase64 = certsData[0]?.certificate;
+    } else if (certsData && certsData.publicKeyCertificatesList) {
+      certBase64 = certsData.publicKeyCertificatesList[0]?.certificate;
+    }
+    
+    if (certBase64) {
+      certCache.set(env, certBase64);
+      certCacheExpires.set(env, Date.now() + (24 * 60 * 60 * 1000));
+    }
+  } else {
+    console.log(`[KSeF Cert Cache] Reusing cached public key certificate for ${env} (skipped HTTP call)`);
   }
   
   if (!certBase64) {
@@ -597,7 +645,8 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
           // "first" sync could get blocked instantly whenever a subject had more
           // invoices than one page (PageSize).
           pageOffset += list.length || pageSize;
-          hasMore = limit ? false : (data.hasMore === true && list.length > 0);
+          // Stop pagination immediately if returned items are less than pageSize (last page reached)
+          hasMore = limit ? false : (data.hasMore === true && list.length >= pageSize && list.length > 0);
 
           // Small pause between pages of the same subject so we stay under the
           // per-second/per-minute sub-limits too, not just the hourly one.
@@ -851,6 +900,40 @@ function generateKsefFa3Xml(data) {
 </Faktura>`.trim();
 }
 
+/**
+ * Fetches current API rate limits status from KSeF API 2.0 (GET /limits/context).
+ */
+async function checkKSeFLimits(nip, decryptedToken, env = 'test', pool = null) {
+  try {
+    const session = await getActiveSession(nip, decryptedToken, env, pool);
+    if (!session || !session.accessToken) {
+      throw new Error("Brak aktywnej sesji KSeF");
+    }
+
+    const apiUrl = getApiUrl(env);
+    const limitsUrl = `${apiUrl}/limits/context`;
+
+    const res = await fetchWithRetry(limitsUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    } else {
+      const errText = await res.text();
+      throw new Error(`Błąd sprawdzania limitów (${res.status}): ${errText}`);
+    }
+  } catch (err) {
+    console.error("[KSeF Limits Check Error]", err.message);
+    throw err;
+  }
+}
+
 module.exports = {
   encryptToken,
   decryptToken,
@@ -859,5 +942,8 @@ module.exports = {
   syncInvoicesToDb,
   determineCategory,
   generateMockInvoices,
-  generateKsefFa3Xml
+  generateKsefFa3Xml,
+  checkKSeFLimits,
+  getLastSyncLogs,
+  clearSyncLogs
 };

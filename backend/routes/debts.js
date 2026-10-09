@@ -693,6 +693,8 @@ async function handleToggleScheduleItem(scheduleId, res) {
       [newPaidStatus, newPaidStatus ? new Date() : null, scheduleId]
     );
 
+    await syncDebtWithSchedule(client, debt.id);
+
     const allSchedRes = await client.query(
       "SELECT * FROM debt_schedules WHERE debt_id = $1 ORDER BY installment_number ASC",
       [debt.id]
@@ -701,14 +703,8 @@ async function handleToggleScheduleItem(scheduleId, res) {
     const hasPaidInCurrentMonth = allSchedRes.rows.some(s => s.is_paid && s.due_date && new Date(s.due_date).toISOString().substring(0, 7) === currentMonthPrefix);
 
     await client.query(
-      `UPDATE debts 
-       SET total_amount = $1, 
-           is_paid_this_month = $2,
-           capital_installment = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE capital_installment END,
-           interest_installment = CASE WHEN $4::numeric > 0 THEN $4::numeric ELSE interest_installment END,
-           updated_at = NOW() 
-       WHERE id = $5`,
-      [newTotal, hasPaidInCurrentMonth, capitalPart, interestPart, debt.id]
+      `UPDATE debts SET is_paid_this_month = $1 WHERE id = $2`,
+      [hasPaidInCurrentMonth, debt.id]
     );
 
     if (newPaidStatus) {
@@ -719,8 +715,8 @@ async function handleToggleScheduleItem(scheduleId, res) {
           debt.id,
           debt.creditor,
           parseAmount(item.total_installment),
-          capitalPart,
-          interestPart,
+          parseAmount(item.capital_part),
+          parseAmount(item.interest_part),
           item.due_date,
           `Rata nr ${item.installment_number} odznaczona z harmonogramu spłat (spłata kapitału)`
         ]
@@ -752,6 +748,13 @@ router.put("/schedule/item/:scheduleId/toggle-paid", asyncHandler(async (req, re
 // GET /api/debts - Fetch list of debts and calculate aggregate sums
 router.get("/", asyncHandler(async (req, res) => {
   await ensureMonthlyInstallmentsAndResets(pool);
+  
+  // Sync all debts that have schedules to ensure exact total_amount
+  const debtsWithSched = await pool.query("SELECT DISTINCT debt_id FROM debt_schedules");
+  for (const row of debtsWithSched.rows) {
+    await syncDebtWithSchedule(pool, row.debt_id);
+  }
+
   const debtsRes = await pool.query(`
     SELECT d.*,
       COALESCE((SELECT COUNT(*) FROM debt_schedules ds WHERE ds.debt_id = d.id), 0)::int as total_schedule_count,

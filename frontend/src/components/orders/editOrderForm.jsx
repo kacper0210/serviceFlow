@@ -4,7 +4,7 @@ import AddClientForm from "../clients/addClientForm";
 export default function EditOrderForm({ order, clients, onCancel, onSaved }) {
   const formatDate = (dateString) => {
     if (!dateString) return "";
-    return new Date(dateString).toISOString().slice(0, 16);
+    return new Date(dateString).toISOString().slice(0, 10);
   };
 
   const [formData, setFormData] = useState({
@@ -177,9 +177,9 @@ export default function EditOrderForm({ order, clients, onCancel, onSaved }) {
 
           <div className="form-row" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: 14 }}>
             <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Termin realizacji (Deadline)</label>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>Planowany dzień robót</label>
               <input
-                type="datetime-local"
+                type="date"
                 name="deadline"
                 value={formData.deadline}
                 onChange={handleChange}

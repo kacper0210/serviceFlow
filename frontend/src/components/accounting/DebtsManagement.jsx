@@ -237,6 +237,48 @@ export default function DebtsManagement() {
     debtsTable: true
   });
 
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const changeMonth = (offset) => {
+    setSelectedMonth(prev => {
+      const [y, m] = prev.split('-').map(Number);
+      const d = new Date(y, m - 1 + offset, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+  };
+
+  const resetToCurrentMonth = () => {
+    const d = new Date();
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const getMonthLabel = (monthStr) => {
+    if (!monthStr) return "";
+    const [y, m] = monthStr.split('-').map(Number);
+    const monthNames = [
+      "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+      "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+    ];
+    return `${monthNames[m - 1]} ${y}`;
+  };
+
+  const overduePayments = useMemo(() => {
+    return payments.filter(p => !p.is_paid && p.due_date && p.due_date.slice(0, 7) < selectedMonth);
+  }, [payments, selectedMonth]);
+
+  const overduePendingBills = useMemo(() => {
+    return pendingBills.filter(b => !b.is_paid && b.due_date && b.due_date.slice(0, 7) < selectedMonth);
+  }, [pendingBills, selectedMonth]);
+
+  const totalOverdueAmount = useMemo(() => {
+    const pSum = overduePayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    const bSum = overduePendingBills.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
+    return pSum + bSum;
+  }, [overduePayments, overduePendingBills]);
+
   const toggleSection = (sectionKey) => {
     setCollapsedSections(prev => ({
       ...prev,
@@ -1169,6 +1211,129 @@ export default function DebtsManagement() {
         </div>
       </div>
 
+      {/* Month Navigation Control Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px',
+        padding: '10px 16px',
+        marginBottom: '16px',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-secondary-outline btn-sm"
+            onClick={() => changeMonth(-1)}
+            title="Poprzedni miesiąc"
+          >
+            ◀ Poprzedni
+          </button>
+
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+            className="form-input"
+            style={{ height: '36px', padding: '0 10px', fontSize: '0.9rem', fontWeight: 700, borderRadius: '8px' }}
+          />
+
+          <button
+            type="button"
+            className="btn btn-secondary-outline btn-sm"
+            onClick={() => changeMonth(1)}
+            title="Następny miesiąc"
+          >
+            Następny ▶
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ background: 'var(--primary-light)', color: 'var(--primary-color)', fontWeight: 600, border: 'none' }}
+            onClick={resetToCurrentMonth}
+          >
+            Obecny miesiąc
+          </button>
+        </div>
+
+        <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary-color)' }}>
+          🗓️ Wybrany miesiąc: {getMonthLabel(selectedMonth)}
+        </div>
+      </div>
+
+      {/* Overdue Payments Alert Banner */}
+      {totalOverdueAmount > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%)',
+          border: '1.5px solid rgba(239, 68, 68, 0.4)',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          marginBottom: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+              <div>
+                <strong style={{ color: '#dc2626', fontSize: '0.95rem' }}>
+                  Zaległości z poprzednich miesięcy ({overduePayments.length + overduePendingBills.length} nieopłacone pozycje)
+                </strong>
+                <div style={{ fontSize: '0.82rem', color: '#b91c1c', marginTop: '2px' }}>
+                  Łączna kwota zaległości: <strong>{formatPLN(totalOverdueAmount)}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed rgba(239,68,68,0.3)', paddingTop: '10px' }}>
+            {overduePayments.map(p => (
+              <div key={`ov-p-${p.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={p.is_paid}
+                    onChange={() => handleTogglePaymentPaid(p.id, p.is_paid)}
+                    className="custom-checkbox"
+                  />
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#991b1b' }}>{p.creditor} (Rata)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#7f1d1d', marginLeft: '8px' }}>Termin: {p.due_date}</span>
+                  </div>
+                </div>
+                <strong style={{ color: '#dc2626', fontSize: '0.9rem' }}>{formatPLN(p.amount)}</strong>
+              </div>
+            ))}
+
+            {overduePendingBills.map(b => (
+              <div key={`ov-b-${b.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={b.is_paid}
+                    onChange={() => {
+                      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/debts/pending-bills/${b.id}/toggle-paid`, {
+                        method: "PUT",
+                        headers: { "Authorization": `Bearer ${JSON.parse(localStorage.getItem("auth"))?.token}` }
+                      }).then(() => fetchData());
+                    }}
+                    className="custom-checkbox"
+                  />
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#991b1b' }}>{b.title} (Faktura/Rachunek)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#7f1d1d', marginLeft: '8px' }}>Termin: {b.due_date}</span>
+                  </div>
+                </div>
+                <strong style={{ color: '#dc2626', fontSize: '0.9rem' }}>{formatPLN(b.amount)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 4 Financial KPI Stat Cards */}
       <div className="financial-kpi-grid">
         <div className="kpi-card danger">
@@ -1318,7 +1483,7 @@ export default function DebtsManagement() {
             <div className="minimal-card">
               <div className="card-collapsible-header" onClick={() => toggleSection('schedule')}>
                 <div className="header-top-row">
-                  <h4 className="card-title">Terminarz spłat rat (sierpień 2026)</h4>
+                  <h4 className="card-title">Terminarz spłat rat ({getMonthLabel(selectedMonth)})</h4>
                   <span className="collapse-pill">{collapsedSections.schedule ? '▶ Rozwiń' : '▼ Zwiń'}</span>
                 </div>
                 <div className="header-bottom-actions" onClick={e => e.stopPropagation()}>
@@ -1328,10 +1493,10 @@ export default function DebtsManagement() {
 
               {!collapsedSections.schedule && (
                 <div className="checklist">
-                  {payments.filter(p => p.due_date && p.due_date.startsWith(new Date().toISOString().slice(0, 7))).length === 0 ? (
-                    <div className="chart-empty-state">Brak wpisanych terminów rat na ten miesiąc</div>
+                  {payments.filter(p => p.due_date && p.due_date.startsWith(selectedMonth)).length === 0 ? (
+                    <div className="chart-empty-state">Brak wpisanych terminów rat na wybrany miesiąc</div>
                   ) : (
-                    [...payments.filter(p => p.due_date && p.due_date.startsWith(new Date().toISOString().slice(0, 7)))]
+                    [...payments.filter(p => p.due_date && p.due_date.startsWith(selectedMonth))]
                       .sort((a, b) => {
                         if (a.is_paid !== b.is_paid) return a.is_paid ? 1 : -1;
                         return new Date(a.due_date) - new Date(b.due_date);

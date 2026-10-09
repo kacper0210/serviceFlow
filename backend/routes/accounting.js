@@ -152,6 +152,8 @@ router.post("/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
   const settings = settingsRes.rows[0];
   const env = settings ? settings.environment : "mock";
 
+  ksefService.clearSyncLogs();
+
   try {
     let decryptedToken = null;
     if (env !== 'mock') {
@@ -170,9 +172,12 @@ router.post("/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
       month,
       limit ? parseInt(limit, 10) : null
     );
-    res.json({ success: true, invoices, last_sync_at: new Date() });
+
+    const debugLogs = ksefService.getLastSyncLogs();
+    res.json({ success: true, invoices, last_sync_at: new Date(), debug_logs: debugLogs });
   } catch (err) {
     console.error("KSeF sync failed:", err);
+    const debugLogs = ksefService.getLastSyncLogs();
 
     const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
@@ -193,6 +198,7 @@ router.post("/ksef/sync", checkAuth, asyncHandler(async (req, res) => {
       invoices: cachedRes.rows,
       last_sync_at: settings?.last_sync_at,
       retry_after: isRateLimit ? retryAfter : null,
+      debug_logs: debugLogs,
       warning: isRateLimit
         ? `⏱️ ${err.message || "Bramka KSeF (MF) nakłada limit zapytań."} Wyświetlono faktury z lokalnej bazy danych (${cachedRes.rows.length} szt.).`
         : `Błąd połączenia z KSeF (${err.message}). Wyświetlono faktury z lokalnej bazy.`
@@ -238,6 +244,8 @@ router.post("/ksef/fetch", checkAuth, asyncHandler(async (req, res) => {
     decryptedToken = ksefService.decryptToken(settings.encrypted_token, settings.iv, settings.tag);
   }
 
+  ksefService.clearSyncLogs();
+
   try {
     const invoices = await ksefService.syncInvoicesToDb(
       pool,
@@ -247,9 +255,11 @@ router.post("/ksef/fetch", checkAuth, asyncHandler(async (req, res) => {
       year,
       month
     );
-    res.json({ invoices, last_sync_at: new Date().toISOString() });
+    const debugLogs = ksefService.getLastSyncLogs();
+    res.json({ invoices, last_sync_at: new Date().toISOString(), debug_logs: debugLogs });
   } catch (err) {
     console.error("KSeF fetch failed:", err);
+    const debugLogs = ksefService.getLastSyncLogs();
 
     const cachedRes = await pool.query(
       `SELECT * FROM ksef_invoices 
@@ -264,13 +274,31 @@ router.post("/ksef/fetch", checkAuth, asyncHandler(async (req, res) => {
       return res.json({
         invoices: cachedRes.rows,
         last_sync_at: settings?.last_sync_at,
+        debug_logs: debugLogs,
         warning: isRateLimit
-          ? "⏱️ Bramka KSeF (Ministerstwo Finansów) nakłada chwilowy limit zapytań (Rate Limit). Wyświetlono faktury z lokalnej bazy. Zsynchronizuj ponownie za ok. 1 minutę."
+          ? "⏱️ Bramka KSeF (Ministerstwo Finansów) nakłada chwilowy limit zapytań (Rate Limit). Wyświetlono faktury z lokalnej bazy."
           : `Błąd połączenia z KSeF (${err.message}). Wyświetlono faktury z lokalnej bazy.`
       });
     }
 
-    return res.status(502).json({ error: `Błąd komunikacji z KSeF: ${err.message}` });
+    return res.status(502).json({ error: `Błąd komunikacji z KSeF: ${err.message}`, debug_logs: debugLogs });
+  }
+}));
+
+// GET /api/accounting/ksef/limits - Check KSeF API Rate Limits status
+router.get("/ksef/limits", checkAuth, asyncHandler(async (req, res) => {
+  const settingsRes = await pool.query("SELECT * FROM ksef_settings LIMIT 1");
+  const settings = settingsRes.rows[0];
+
+  if (!settings || !settings.nip || !settings.ksef_token) {
+    return res.status(400).json({ error: "Brak skonfigurowanego NIP lub Tokena KSeF" });
+  }
+
+  try {
+    const limits = await ksefService.checkKSeFLimits(settings.nip, settings.ksef_token, settings.environment || 'test', pool);
+    res.json(limits);
+  } catch (err) {
+    res.status(500).json({ error: `Nie udało się pobrać limitów KSeF: ${err.message}` });
   }
 }));
 
