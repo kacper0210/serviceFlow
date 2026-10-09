@@ -567,8 +567,10 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
             to: `${dateTo}T23:59:59Z`,
             dateType: "Issue"
           },
-          PageOffset: pageOffset,
-          PageSize: pageSize
+          pageSize: pageSize,
+          pageOffset: pageOffset,
+          PageSize: pageSize,
+          PageOffset: pageOffset
         };
 
         const queryOptions = {
