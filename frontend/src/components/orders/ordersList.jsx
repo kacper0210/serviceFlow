@@ -46,7 +46,7 @@ export default function OrdersList() {
     if (statusParam) {
       return statusParam.split(',').map(s => s.trim()).filter(Boolean);
     }
-    return ['w_trakcie', 'zakonczone'];
+    return ['nowe', 'w_trakcie'];
   });
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [filterMonth, setFilterMonth] = useState("");
