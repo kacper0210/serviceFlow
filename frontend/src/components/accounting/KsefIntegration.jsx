@@ -455,9 +455,9 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
             </button>
 
             <button
-              onClick={() => handleSyncKsef(5)}
+              onClick={() => handleSyncKsef(10)}
               className="btn-secondary"
-              title="Pobierz maksymalnie 5 faktur na próbę (zapobiega limitom MF)"
+              title="Pobierz maksymalnie 10 faktur na próbę (zapobiega limitom MF)"
               style={{
                 padding: "8px 12px",
                 fontSize: "0.82rem",
@@ -470,7 +470,7 @@ export default function KsefIntegration({ period: externalPeriod, setPeriod: ext
               }}
               disabled={syncing || retryCountdown > 0}
             >
-              ⚡ Test (5 faktur)
+              ⚡ Test (10 faktur)
             </button>
 
             <button

@@ -168,11 +168,15 @@ export default function DebtsManagement() {
   const [payments, setPayments] = useState([]);
   const [fixedExpenses, setFixedExpenses] = useState([]);
   const [totalFixedMonthly, setTotalFixedMonthly] = useState(0);
+  const [allOverdueFixed, setAllOverdueFixed] = useState([]);
   const [pendingBills, setPendingBills] = useState([]);
   const [unpaidBillsTotal, setUnpaidBillsTotal] = useState(0);
 
+  const [scheduleTypeFilter, setScheduleTypeFilter] = useState("all"); // "all" | "installment" | "fixed" | "bill"
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState("all"); // "all" | "unpaid" | "paid"
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview"); // overview | debts | fixed_bills | pending_bills
+  const [activeTab, setActiveTab] = useState("overview"); // overview | monitoring | debts | fixed_bills | pending_bills
 
   // Modals & Editing states
   const [showAddDebtModal, setShowAddDebtModal] = useState(false);
@@ -276,8 +280,9 @@ export default function DebtsManagement() {
   const totalOverdueAmount = useMemo(() => {
     const pSum = overduePayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
     const bSum = overduePendingBills.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
-    return pSum + bSum;
-  }, [overduePayments, overduePendingBills]);
+    const fSum = allOverdueFixed.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+    return pSum + bSum + fSum;
+  }, [overduePayments, overduePendingBills, allOverdueFixed]);
 
   const toggleSection = (sectionKey) => {
     setCollapsedSections(prev => ({
@@ -350,7 +355,7 @@ export default function DebtsManagement() {
         fetch(`${baseUrl}/api/debts`, { headers }),
         fetch(`${baseUrl}/api/debts/snapshots`, { headers }),
         fetch(`${baseUrl}/api/debts/payments`, { headers }),
-        fetch(`${baseUrl}/api/debts/fixed-expenses`, { headers }),
+        fetch(`${baseUrl}/api/debts/fixed-expenses?month=${selectedMonth}`, { headers }),
         fetch(`${baseUrl}/api/debts/pending-bills`, { headers }),
         fetch(`${baseUrl}/api/debts/fixed-incomes`, { headers })
       ]);
@@ -368,6 +373,7 @@ export default function DebtsManagement() {
       setPayments(Array.isArray(payData) ? payData : []);
       setFixedExpenses(Array.isArray(fixedData.expenses) ? fixedData.expenses : []);
       setTotalFixedMonthly(fixedData.total_monthly || 0);
+      setAllOverdueFixed(Array.isArray(fixedData.all_overdue_fixed) ? fixedData.all_overdue_fixed : []);
       setPendingBills(Array.isArray(pendData.bills) ? pendData.bills : []);
 
       setFixedIncomes(Array.isArray(incomeData.incomes) ? incomeData.incomes : []);
@@ -378,7 +384,7 @@ export default function DebtsManagement() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -982,6 +988,50 @@ export default function DebtsManagement() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${authData?.token}`
         },
+        body: JSON.stringify({ is_paid: !currentStatus, month: selectedMonth })
+      });
+
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleFixedPaymentPaid = async (paymentId, currentStatus) => {
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+      const res = await fetch(`${baseUrl}/api/debts/fixed-expenses/payments/${paymentId}/toggle-paid`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
+        body: JSON.stringify({ is_paid: !currentStatus })
+      });
+
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleTogglePendingBillPaid = async (billId, currentStatus) => {
+    try {
+      const authData = JSON.parse(localStorage.getItem("auth"));
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+      const res = await fetch(`${baseUrl}/api/debts/pending-bills/${billId}/toggle-paid`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authData?.token}`
+        },
         body: JSON.stringify({ is_paid: !currentStatus })
       });
 
@@ -1093,13 +1143,11 @@ export default function DebtsManagement() {
   }, [summary.total_installments, totalFixedMonthly]);
 
   const currentMonthEndStr = useMemo(() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    const monthStr = String(month + 1).padStart(2, '0');
-    return `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
-  }, []);
+    if (!selectedMonth) return "";
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }, [selectedMonth]);
 
   const monthlySummary = useMemo(() => {
     // 1. Unpaid installments for debts (is_paid_this_month === false)
@@ -1109,18 +1157,18 @@ export default function DebtsManagement() {
     const unpaidInstallmentsTotal = unpaidDebts.reduce((sum, d) => sum + Number(d.monthly_installment || 0), 0);
     const paidInstallmentsTotal = paidDebts.reduce((sum, d) => sum + Number(d.monthly_installment || 0), 0);
 
-    // 2. Unpaid pending bills DUE IN CURRENT MONTH OR OVERDUE (due_date <= currentMonthEndStr)
-    const unpaidBillsThisMonth = pendingBills.filter(b => !b.is_paid && b.due_date <= currentMonthEndStr);
-    const paidBillsThisMonth = pendingBills.filter(b => b.is_paid && b.due_date <= currentMonthEndStr);
+    // 2. Unpaid pending bills DUE IN SELECTED MONTH
+    const unpaidBillsThisMonth = pendingBills.filter(b => !b.is_paid && b.due_date && b.due_date.startsWith(selectedMonth));
+    const paidBillsThisMonth = pendingBills.filter(b => b.is_paid && b.due_date && b.due_date.startsWith(selectedMonth));
 
-    // Future pending bills (due after current month end, e.g. September)
-    const futurePendingBills = pendingBills.filter(b => !b.is_paid && b.due_date > currentMonthEndStr);
+    // Future pending bills (due after selected month)
+    const futurePendingBills = pendingBills.filter(b => !b.is_paid && b.due_date && b.due_date.slice(0, 7) > selectedMonth);
 
     const unpaidBillsTotalSum = unpaidBillsThisMonth.reduce((sum, b) => sum + Number(b.amount || 0), 0);
     const paidBillsTotalSum = paidBillsThisMonth.reduce((sum, b) => sum + Number(b.amount || 0), 0);
     const futureBillsTotalSum = futurePendingBills.reduce((sum, b) => sum + Number(b.amount || 0), 0);
 
-    // 3. Active fixed expenses (split by paid/unpaid status)
+    // 3. Active fixed expenses (split by paid/unpaid status for selected month)
     const activeFixed = fixedExpenses.filter(f => f.is_active !== false);
     const unpaidFixed = activeFixed.filter(f => !f.is_paid_this_month);
     const paidFixed = activeFixed.filter(f => f.is_paid_this_month);
@@ -1145,7 +1193,131 @@ export default function DebtsManagement() {
       paidFixedTotal,
       totalRemainingToPay
     };
-  }, [debts, pendingBills, fixedExpenses, currentMonthEndStr]);
+  }, [debts, pendingBills, fixedExpenses, selectedMonth]);
+
+  // Combined and sorted schedule items for the selected month (Raty + Opłaty stałe + Rachunki)
+  const monthScheduleItems = useMemo(() => {
+    const items = [];
+
+    // 1. Debt installment payments for selectedMonth
+    payments
+      .filter(p => p.due_date && p.due_date.startsWith(selectedMonth))
+      .forEach(p => {
+        const day = parseInt(p.due_date.split('-')[2], 10) || 1;
+        items.push({
+          id: `pay-${p.id}`,
+          rawId: p.id,
+          type: 'installment',
+          typeLabel: 'Rata kredytu',
+          typeBadgeColor: '#4f46e5',
+          typeBadgeBg: '#e0e7ff',
+          title: p.creditor,
+          category: 'Kredyt / Pożyczka',
+          amount: parseFloat(p.amount) || 0,
+          due_date: p.due_date,
+          day: day,
+          is_paid: Boolean(p.is_paid),
+          subtitle: p.interest_amount > 0 ? `Odsetki: ${formatPLN(p.interest_amount)}` : null,
+          toggle: () => handleTogglePaymentPaid(p.id, p.is_paid)
+        });
+      });
+
+    // 2. Fixed monthly expenses for selectedMonth
+    const [yStr, mStr] = selectedMonth.split('-');
+    const maxDays = new Date(parseInt(yStr, 10), parseInt(mStr, 10), 0).getDate();
+
+    fixedExpenses
+      .filter(f => f.is_active !== false)
+      .forEach(f => {
+        const dueDay = Math.min(f.due_day || 10, maxDays);
+        const dueDate = `${selectedMonth}-${String(dueDay).padStart(2, '0')}`;
+        items.push({
+          id: `fix-${f.id}`,
+          rawId: f.id,
+          type: 'fixed',
+          typeLabel: 'Opłata stała',
+          typeBadgeColor: '#059669',
+          typeBadgeBg: '#d1fae5',
+          title: f.name,
+          category: f.category || 'Opłata stała',
+          amount: parseFloat(f.amount) || 0,
+          due_date: dueDate,
+          day: dueDay,
+          is_paid: Boolean(f.is_paid_this_month),
+          unpaidPreviousMonths: f.unpaid_previous_months || [],
+          unpaidPreviousTotal: f.unpaid_previous_total || 0,
+          subtitle: f.category ? `Kategoria: ${f.category}` : null,
+          toggle: () => handleToggleFixedPaid(f.id, f.is_paid_this_month)
+        });
+      });
+
+    // 3. Pending bills due in selectedMonth
+    pendingBills
+      .filter(b => b.due_date && b.due_date.startsWith(selectedMonth))
+      .forEach(b => {
+        const day = parseInt(b.due_date.split('-')[2], 10) || 1;
+        items.push({
+          id: `bill-${b.id}`,
+          rawId: b.id,
+          type: 'bill',
+          typeLabel: 'Rachunek / Faktura',
+          typeBadgeColor: '#d97706',
+          typeBadgeBg: '#fef3c7',
+          title: b.title,
+          category: b.category || 'Faktura',
+          amount: parseFloat(b.amount) || 0,
+          due_date: b.due_date,
+          day: day,
+          is_paid: Boolean(b.is_paid),
+          subtitle: b.invoice_number ? `Faktura: ${b.invoice_number}` : null,
+          toggle: () => handleTogglePendingBillPaid(b.id, b.is_paid)
+        });
+      });
+
+    // Sort chronologically by day
+    return items.sort((a, b) => {
+      if (a.day !== b.day) return a.day - b.day;
+      return a.title.localeCompare(b.title);
+    });
+  }, [payments, fixedExpenses, pendingBills, selectedMonth]);
+
+  const filteredScheduleItems = useMemo(() => {
+    return monthScheduleItems.filter(item => {
+      if (scheduleTypeFilter !== 'all' && item.type !== scheduleTypeFilter) return false;
+      if (scheduleStatusFilter === 'unpaid' && item.is_paid) return false;
+      if (scheduleStatusFilter === 'paid' && !item.is_paid) return false;
+      return true;
+    });
+  }, [monthScheduleItems, scheduleTypeFilter, scheduleStatusFilter]);
+
+  const scheduleStats = useMemo(() => {
+    const totalCount = monthScheduleItems.length;
+    const paidCount = monthScheduleItems.filter(i => i.is_paid).length;
+    const unpaidCount = totalCount - paidCount;
+
+    const totalAmount = monthScheduleItems.reduce((sum, i) => sum + i.amount, 0);
+    const paidAmount = monthScheduleItems.filter(i => i.is_paid).reduce((sum, i) => sum + i.amount, 0);
+    const unpaidAmount = totalAmount - paidAmount;
+
+    const percent = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
+
+    const installmentCount = monthScheduleItems.filter(i => i.type === 'installment').length;
+    const fixedCount = monthScheduleItems.filter(i => i.type === 'fixed').length;
+    const billCount = monthScheduleItems.filter(i => i.type === 'bill').length;
+
+    return {
+      totalCount,
+      paidCount,
+      unpaidCount,
+      totalAmount,
+      paidAmount,
+      unpaidAmount,
+      percent,
+      installmentCount,
+      fixedCount,
+      billCount
+    };
+  }, [monthScheduleItems]);
 
   // SVG Chart Calculation
   const chartData = useMemo(() => {
@@ -1280,7 +1452,7 @@ export default function DebtsManagement() {
               <span style={{ fontSize: '1.5rem' }}>⚠️</span>
               <div>
                 <strong style={{ color: '#dc2626', fontSize: '0.95rem' }}>
-                  Zaległości z poprzednich miesięcy ({overduePayments.length + overduePendingBills.length} nieopłacone pozycje)
+                  Zaległości z poprzednich miesięcy ({overduePayments.length + overduePendingBills.length + allOverdueFixed.length} nieopłacone pozycje)
                 </strong>
                 <div style={{ fontSize: '0.82rem', color: '#b91c1c', marginTop: '2px' }}>
                   Łączna kwota zaległości: <strong>{formatPLN(totalOverdueAmount)}</strong>
@@ -1298,6 +1470,7 @@ export default function DebtsManagement() {
                     checked={p.is_paid}
                     onChange={() => handleTogglePaymentPaid(p.id, p.is_paid)}
                     className="custom-checkbox"
+                    title="Oznacz jako opłacone"
                   />
                   <div>
                     <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#991b1b' }}>{p.creditor} (Rata)</span>
@@ -1308,19 +1481,45 @@ export default function DebtsManagement() {
               </div>
             ))}
 
+            {allOverdueFixed.map(f => (
+              <div key={`ov-f-${f.payment_id || f.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={f.is_paid}
+                    onChange={() => handleToggleFixedPaymentPaid(f.payment_id || f.id, f.is_paid)}
+                    className="custom-checkbox"
+                    title="Oznacz zaległą opłatę stałą jako opłaconą"
+                  />
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#991b1b' }}>{f.name} (Opłata stała)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#7f1d1d', marginLeft: '8px' }}>
+                      Zaległość za: <strong>{f.month_label || f.year_month}</strong> {f.due_date && `• Pierwotny termin: ${f.due_date}`}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <strong style={{ color: '#dc2626', fontSize: '0.9rem' }}>{formatPLN(f.amount)}</strong>
+                  <button
+                    className="btn-sm"
+                    style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.74rem', cursor: 'pointer' }}
+                    onClick={() => handleToggleFixedPaymentPaid(f.payment_id || f.id, f.is_paid)}
+                  >
+                    Opłać ✓
+                  </button>
+                </div>
+              </div>
+            ))}
+
             {overduePendingBills.map(b => (
               <div key={`ov-b-${b.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <input
                     type="checkbox"
                     checked={b.is_paid}
-                    onChange={() => {
-                      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/debts/pending-bills/${b.id}/toggle-paid`, {
-                        method: "PUT",
-                        headers: { "Authorization": `Bearer ${JSON.parse(localStorage.getItem("auth"))?.token}` }
-                      }).then(() => fetchData());
-                    }}
+                    onChange={() => handleTogglePendingBillPaid(b.id, b.is_paid)}
                     className="custom-checkbox"
+                    title="Oznacz jako opłacone"
                   />
                   <div>
                     <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#991b1b' }}>{b.title} (Faktura/Rachunek)</span>
@@ -1349,6 +1548,14 @@ export default function DebtsManagement() {
             {monthlySummary.futureBillsTotalSum > 0 && (
               <div style={{ marginTop: '4px', fontSize: '0.74rem', color: '#64748b' }}>
                 Faktury z przyszłych miesięcy: <strong>{formatPLN(monthlySummary.futureBillsTotalSum)}</strong>
+              </div>
+            )}
+            {totalOverdueAmount > 0 && (
+              <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(239,68,68,0.3)', fontSize: '0.75rem', color: '#dc2626' }}>
+                ⚠️ Zaległości z poprz. miesięcy: <strong>{formatPLN(totalOverdueAmount)}</strong>
+                <div style={{ marginTop: '2px', fontWeight: 700 }}>
+                  Łącznie: {formatPLN(monthlySummary.totalRemainingToPay + totalOverdueAmount)}
+                </div>
               </div>
             )}
           </span>
@@ -1394,6 +1601,22 @@ export default function DebtsManagement() {
           Przegląd
         </button>
         <button
+          className={`segmented-tab ${activeTab === 'monitoring' ? 'active' : ''}`}
+          onClick={() => setActiveTab('monitoring')}
+        >
+          Monitoring płatności{" "}
+          <span
+            className="badge-count"
+            style={{
+              background: totalOverdueAmount > 0 ? '#ef4444' : 'rgba(99, 102, 241, 0.35)',
+              color: '#fff',
+              fontWeight: 700
+            }}
+          >
+            {totalOverdueAmount > 0 ? `⚠️ ${allOverdueFixed.length + overduePayments.length + overduePendingBills.length}` : `${scheduleStats.paidCount}/${scheduleStats.totalCount}`}
+          </span>
+        </button>
+        <button
           className={`segmented-tab ${activeTab === 'debts' ? 'active' : ''}`}
           onClick={() => setActiveTab('debts')}
         >
@@ -1409,7 +1632,11 @@ export default function DebtsManagement() {
           className={`segmented-tab ${activeTab === 'fixed_bills' ? 'active' : ''}`}
           onClick={() => setActiveTab('fixed_bills')}
         >
-          Opłaty stałe <span className="badge-count">{fixedExpenses.length}</span>
+          Opłaty stałe{" "}
+          <span className="badge-count">
+            {fixedExpenses.length}
+            {allOverdueFixed.length > 0 && ` (⚠️ ${allOverdueFixed.length})`}
+          </span>
         </button>
         <button
           className={`segmented-tab ${activeTab === 'pending_bills' ? 'active' : ''}`}
@@ -1479,49 +1706,142 @@ export default function DebtsManagement() {
 
           {/* Row 2: 2 Equal Columns (Terminarz & Zestawienie Rat) */}
           <div className="minimal-grid-2">
-            {/* Column 1: Payment Checklist (Current Month Only) */}
+            {/* Column 1: Payment Checklist (Unified Month Schedule) */}
             <div className="minimal-card">
               <div className="card-collapsible-header" onClick={() => toggleSection('schedule')}>
                 <div className="header-top-row">
-                  <h4 className="card-title">Terminarz spłat rat ({getMonthLabel(selectedMonth)})</h4>
+                  <h4 className="card-title">Terminarz płatności ({getMonthLabel(selectedMonth)})</h4>
                   <span className="collapse-pill">{collapsedSections.schedule ? '▶ Rozwiń' : '▼ Zwiń'}</span>
                 </div>
                 <div className="header-bottom-actions" onClick={e => e.stopPropagation()}>
                   <button className="btn-small" onClick={() => setShowAddPaymentModal(true)}>+ Rata</button>
+                  <button className="btn-small" onClick={() => {
+                    setEditingFixed(null);
+                    setFixedForm({ name: "", amount: "", due_day: 10, category: "Stałe", notes: "" });
+                    setShowAddFixedModal(true);
+                  }}>+ Stała</button>
                 </div>
               </div>
 
               {!collapsedSections.schedule && (
-                <div className="checklist">
-                  {payments.filter(p => p.due_date && p.due_date.startsWith(selectedMonth)).length === 0 ? (
-                    <div className="chart-empty-state">Brak wpisanych terminów rat na wybrany miesiąc</div>
-                  ) : (
-                    [...payments.filter(p => p.due_date && p.due_date.startsWith(selectedMonth))]
-                      .sort((a, b) => {
-                        if (a.is_paid !== b.is_paid) return a.is_paid ? 1 : -1;
-                        return new Date(a.due_date) - new Date(b.due_date);
-                      })
-                      .map(p => (
-                        <div key={p.id} className={`check-item ${p.is_paid ? 'is-done' : ''}`}>
+                <>
+                  {/* Filter chips & Mini progress bar */}
+                  <div style={{ padding: '0 4px 10px 4px', borderBottom: '1px solid var(--border-color)', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                      <span>Opłacono: <strong>{scheduleStats.paidCount}/{scheduleStats.totalCount} ({scheduleStats.percent}%)</strong></span>
+                      <span>Pozostało: <strong style={{ color: scheduleStats.unpaidAmount > 0 ? '#ef4444' : '#10b981' }}>{formatPLN(scheduleStats.unpaidAmount)}</strong></span>
+                    </div>
+                    <div style={{ width: '100%', height: '6px', background: 'rgba(99,102,241,0.1)', borderRadius: '999px', overflow: 'hidden', marginBottom: '8px' }}>
+                      <div style={{ width: `${scheduleStats.percent}%`, height: '100%', background: scheduleStats.percent === 100 ? '#10b981' : 'linear-gradient(90deg, #6366f1, #10b981)', borderRadius: '999px' }} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className={`btn-sm ${scheduleTypeFilter === 'all' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                        style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                        onClick={() => setScheduleTypeFilter('all')}
+                      >
+                        Wszystkie ({scheduleStats.totalCount})
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn-sm ${scheduleTypeFilter === 'installment' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                        style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                        onClick={() => setScheduleTypeFilter('installment')}
+                      >
+                        Raty ({scheduleStats.installmentCount})
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn-sm ${scheduleTypeFilter === 'fixed' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                        style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                        onClick={() => setScheduleTypeFilter('fixed')}
+                      >
+                        Stałe ({scheduleStats.fixedCount})
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn-sm ${scheduleTypeFilter === 'bill' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                        style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                        onClick={() => setScheduleTypeFilter('bill')}
+                      >
+                        Rachunki ({scheduleStats.billCount})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="checklist">
+                    {filteredScheduleItems.length === 0 ? (
+                      <div className="chart-empty-state">Brak płatności w wybranej kategorii na ten miesiąc</div>
+                    ) : (
+                      filteredScheduleItems.map(item => (
+                        <div key={item.id} className={`check-item ${item.is_paid ? 'is-done' : ''}`}>
                           <input
                             type="checkbox"
-                            checked={p.is_paid}
-                            onChange={() => handleTogglePaymentPaid(p.id, p.is_paid)}
+                            checked={item.is_paid}
+                            onChange={item.toggle}
                             className="custom-checkbox"
+                            title="Zmień status opłacenia"
                           />
                           <div className="check-body">
                             <div className="check-title-row">
-                              <span className="check-title">{p.creditor}</span>
-                              <span className="check-amount">{formatPLN(p.amount)}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="check-title">{item.title}</span>
+                                <span style={{
+                                  background: item.typeBadgeBg,
+                                  color: item.typeBadgeColor,
+                                  fontSize: '0.68rem',
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  fontWeight: 700
+                                }}>
+                                  {item.typeLabel}
+                                </span>
+                              </div>
+                              <span className="check-amount">{formatPLN(item.amount)}</span>
                             </div>
                             <div className="check-sub">
-                              Termin: {p.due_date} {p.interest_amount > 0 && `• Odsetki: ${formatPLN(p.interest_amount)}`}
+                              Termin: {item.due_date} {item.subtitle && `• ${item.subtitle}`}
                             </div>
+                            {item.unpaidPreviousMonths && item.unpaidPreviousMonths.length > 0 && (
+                              <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                  fontSize: '0.7rem',
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  fontWeight: 700
+                                }}>
+                                  ⚠️ Zaległość z poprz. miesięcy: {item.unpaidPreviousMonths.map(m => m.label).join(', ')} ({formatPLN(item.unpaidPreviousTotal)})
+                                </span>
+                                {item.unpaidPreviousMonths.map(past => (
+                                  <button
+                                    key={past.payment_id}
+                                    type="button"
+                                    onClick={() => handleToggleFixedPaymentPaid(past.payment_id, false)}
+                                    style={{
+                                      background: '#fef2f2',
+                                      color: '#991b1b',
+                                      border: '1px solid #f87171',
+                                      borderRadius: '4px',
+                                      padding: '1px 6px',
+                                      fontSize: '0.68rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Opłać {past.label} ✓
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
-                  )}
-                </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
@@ -1644,6 +1964,437 @@ export default function DebtsManagement() {
             )}
           </div>
         </>
+      )}
+
+      {/* VIEW 1B: MONITORING PŁATNOŚCI (CENTRUM KONTROLI ZOBOWIĄZAŃ) */}
+      {activeTab === 'monitoring' && (
+        <div className="minimal-card full-width">
+          {/* Header with Month Nav & Title */}
+          <div className="minimal-card-header" style={{ flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                Monitoring Płatności i Zobowiązań
+              </h3>
+              <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Centrum kontroli: raty, opłaty stałe i rachunki w jednym miejscu z pamięcią niezapłaconych miesięcy z przeszłości.
+              </p>
+            </div>
+
+            {/* Month Picker / Switcher */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button type="button" className="btn-secondary-outline btn-sm" onClick={() => changeMonth(-1)}>
+                ◀ Poprzedni
+              </button>
+              <input
+                type="month"
+                className="minimal-input"
+                style={{ padding: '6px 10px', fontSize: '0.88rem', fontWeight: 700, borderRadius: '8px', height: '36px' }}
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+              />
+              <button type="button" className="btn-secondary-outline btn-sm" onClick={() => changeMonth(1)}>
+                Następny ▶
+              </button>
+              <button type="button" className="btn-secondary-outline btn-sm" onClick={resetToCurrentMonth}>
+                Bieżący miesiąc
+              </button>
+            </div>
+          </div>
+
+          {/* Month Progress & KPI Summary */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            margin: '16px 0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  Stan realizacji płatności za {getMonthLabel(selectedMonth)}
+                </span>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, marginTop: '2px' }}>
+                  {scheduleStats.paidCount} z {scheduleStats.totalCount} opłacone ({scheduleStats.percent}%)
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Opłacono w tym miesiącu:</span>
+                  <div style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>{formatPLN(scheduleStats.paidAmount)}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pozostało do zapłaty:</span>
+                  <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '1.1rem' }}>{formatPLN(scheduleStats.unpaidAmount)}</div>
+                </div>
+                {totalOverdueAmount > 0 && (
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#b91c1c' }}>Zaległości z przeszłości:</span>
+                    <div style={{ color: '#dc2626', fontWeight: 800, fontSize: '1.1rem' }}>{formatPLN(totalOverdueAmount)}</div>
+                  </div>
+                )}
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Łącznie zobowiązania:</span>
+                  <div style={{ color: '#6366f1', fontWeight: 800, fontSize: '1.1rem' }}>
+                    {formatPLN(scheduleStats.unpaidAmount + totalOverdueAmount)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{
+              width: '100%',
+              height: '8px',
+              background: 'rgba(99, 102, 241, 0.12)',
+              borderRadius: '999px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${scheduleStats.percent}%`,
+                height: '100%',
+                background: scheduleStats.percent === 100 ? '#10b981' : 'linear-gradient(90deg, #6366f1, #10b981)',
+                borderRadius: '999px',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
+
+          {/* Overdue Section in Monitoring if any exist */}
+          {totalOverdueAmount > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%)',
+              border: '1.5px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '20px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <strong style={{ color: '#dc2626', fontSize: '0.98rem' }}>
+                  ⚠️ Przeterminowane płatności i zaległości z poprzednich miesięcy ({overduePayments.length + overduePendingBills.length + allOverdueFixed.length})
+                </strong>
+                <span style={{ color: '#991b1b', fontWeight: 700, fontSize: '0.92rem' }}>
+                  Suma zaległości: {formatPLN(totalOverdueAmount)}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {allOverdueFixed.map(f => (
+                  <div key={`mon-ov-f-${f.payment_id || f.id}`} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#fff',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #fca5a5'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={f.is_paid}
+                        onChange={() => handleToggleFixedPaymentPaid(f.payment_id || f.id, f.is_paid)}
+                        className="custom-checkbox"
+                        title="Oznacz zaległość jako opłaconą"
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#991b1b' }}>
+                          {f.name} <span style={{ fontSize: '0.78rem', background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>Opłata stała</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#7f1d1d', marginTop: '2px' }}>
+                          Zaległość za: <strong>{f.month_label || f.year_month}</strong> {f.due_date && `• Pierwotny termin: ${f.due_date}`}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <strong style={{ color: '#dc2626', fontSize: '1rem' }}>{formatPLN(f.amount)}</strong>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        onClick={() => handleToggleFixedPaymentPaid(f.payment_id || f.id, f.is_paid)}
+                      >
+                        Opłać ✓
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {overduePayments.map(p => (
+                  <div key={`mon-ov-p-${p.id}`} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#fff',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #fca5a5'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={p.is_paid}
+                        onChange={() => handleTogglePaymentPaid(p.id, p.is_paid)}
+                        className="custom-checkbox"
+                        title="Oznacz jako opłacone"
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#991b1b' }}>
+                          {p.creditor} <span style={{ fontSize: '0.78rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>Rata</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#7f1d1d', marginTop: '2px' }}>
+                          Termin: <strong>{p.due_date}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <strong style={{ color: '#dc2626', fontSize: '1rem' }}>{formatPLN(p.amount)}</strong>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        onClick={() => handleTogglePaymentPaid(p.id, p.is_paid)}
+                      >
+                        Opłać ✓
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {overduePendingBills.map(b => (
+                  <div key={`mon-ov-b-${b.id}`} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#fff',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #fca5a5'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={b.is_paid}
+                        onChange={() => handleTogglePendingBillPaid(b.id, b.is_paid)}
+                        className="custom-checkbox"
+                        title="Oznacz jako opłacone"
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#991b1b' }}>
+                          {b.title} <span style={{ fontSize: '0.78rem', background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>Rachunek</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#7f1d1d', marginTop: '2px' }}>
+                          Termin: <strong>{b.due_date}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <strong style={{ color: '#dc2626', fontSize: '1rem' }}>{formatPLN(b.amount)}</strong>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        onClick={() => handleTogglePendingBillPaid(b.id, b.is_paid)}
+                      >
+                        Opłać ✓
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filter Bar for Schedule */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+            marginBottom: '14px',
+            borderBottom: '1px solid var(--border-color)',
+            paddingBottom: '12px'
+          }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleTypeFilter === 'all' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleTypeFilter('all')}
+              >
+                Wszystkie ({scheduleStats.totalCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleTypeFilter === 'installment' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleTypeFilter('installment')}
+              >
+                Raty ({scheduleStats.installmentCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleTypeFilter === 'fixed' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleTypeFilter('fixed')}
+              >
+                Opłaty stałe ({scheduleStats.fixedCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleTypeFilter === 'bill' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleTypeFilter('bill')}
+              >
+                Rachunki ({scheduleStats.billCount})
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleStatusFilter === 'all' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleStatusFilter('all')}
+              >
+                Wszystkie statusy
+              </button>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleStatusFilter === 'unpaid' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleStatusFilter('unpaid')}
+              >
+                Do zapłaty ({scheduleStats.unpaidCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-sm ${scheduleStatusFilter === 'paid' ? 'btn-primary' : 'btn-secondary-outline'}`}
+                onClick={() => setScheduleStatusFilter('paid')}
+              >
+                Opłacone ({scheduleStats.paidCount})
+              </button>
+            </div>
+          </div>
+
+          {/* Table / List of items for selected month */}
+          <div className="table-responsive schedule-table-container">
+            <table className="minimal-table responsive-cards">
+              <thead>
+                <tr>
+                  <th className="text-center" style={{ width: 50 }}>Status</th>
+                  <th style={{ width: 100 }} className="text-center">Termin</th>
+                  <th style={{ width: 140 }}>Typ</th>
+                  <th>Nazwa zobowiązania</th>
+                  <th className="text-right">Kwota</th>
+                  <th className="text-center" style={{ width: 140 }}>Akcja</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredScheduleItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center" style={{ padding: '24px' }}>
+                      Brak pozycji spełniających wybrane kryteria w tym miesiącu.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredScheduleItems.map(item => (
+                    <tr key={item.id} className={item.is_paid ? 'is-done' : ''}>
+                      <td data-label="Status" className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={item.is_paid}
+                          onChange={item.toggle}
+                          className="custom-checkbox"
+                          title="Zmień status opłacenia"
+                        />
+                      </td>
+                      <td data-label="Termin" className="text-center col-bold">
+                        {item.due_date ? `${item.due_date.slice(8, 10)}.${item.due_date.slice(5, 7)}` : `Dzień ${item.day}`}
+                      </td>
+                      <td data-label="Typ">
+                        <span style={{
+                          background: item.typeBadgeBg,
+                          color: item.typeBadgeColor,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700
+                        }}>
+                          {item.typeLabel}
+                        </span>
+                      </td>
+                      <td data-label="Nazwa" className="col-bold">
+                        <div>{item.title}</div>
+                        {item.subtitle && (
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {item.subtitle}
+                          </div>
+                        )}
+                        {item.unpaidPreviousMonths && item.unpaidPreviousMonths.length > 0 && (
+                          <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              background: '#fee2e2',
+                              color: '#b91c1c',
+                              border: '1px solid #fca5a5',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700
+                            }}>
+                              ⚠️ Niezapłacone z poprz. miesięcy: {item.unpaidPreviousMonths.map(m => m.label).join(', ')} ({formatPLN(item.unpaidPreviousTotal)})
+                            </span>
+                            {item.unpaidPreviousMonths.map(past => (
+                              <button
+                                key={past.payment_id}
+                                type="button"
+                                onClick={() => handleToggleFixedPaymentPaid(past.payment_id, false)}
+                                style={{
+                                  background: '#fef2f2',
+                                  color: '#991b1b',
+                                  border: '1px solid #f87171',
+                                  borderRadius: '4px',
+                                  padding: '1px 6px',
+                                  fontSize: '0.72rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Opłać {past.label} ✓
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td data-label="Kwota" className={`text-right col-bold ${item.is_paid ? 'paid' : ''}`} style={{
+                        color: item.is_paid ? '#10b981' : '#6366f1',
+                        fontSize: '1rem'
+                      }}>
+                        {formatPLN(item.amount)}
+                      </td>
+                      <td data-label="Akcja" className="text-center">
+                        <button
+                          type="button"
+                          className="btn-sm"
+                          style={{
+                            background: item.is_paid ? 'rgba(16, 185, 129, 0.12)' : 'rgba(99, 102, 241, 0.12)',
+                            color: item.is_paid ? '#10b981' : '#6366f1',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                          onClick={item.toggle}
+                        >
+                          {item.is_paid ? 'Opłacone ✓' : 'Do zapłaty'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* VIEW 2: DEBTS LIST */}
@@ -1769,21 +2520,64 @@ export default function DebtsManagement() {
                           checked={Boolean(f.is_paid_this_month)}
                           onChange={() => handleToggleFixedPaid(f.id, f.is_paid_this_month)}
                           className="custom-checkbox"
-                          title="Zaznacz jako opłacone w tym miesiącu"
+                          title={`Zaznacz jako opłacone w miesiącu: ${getMonthLabel(selectedMonth)}`}
                         />
                       </td>
-                      <td data-label="Usługa" className="col-bold">{f.name}</td>
+                      <td data-label="Usługa" className="col-bold">
+                        <div>{f.name}</div>
+                        {f.unpaid_previous_months && f.unpaid_previous_months.length > 0 && (
+                          <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              background: '#fee2e2',
+                              color: '#b91c1c',
+                              border: '1px solid #fca5a5',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700
+                            }}>
+                              ⚠️ Niezapłacone z poprz. miesięcy: {f.unpaid_previous_months.map(m => m.label).join(', ')} ({formatPLN(f.unpaid_previous_total)})
+                            </span>
+                            {f.unpaid_previous_months.map(past => (
+                              <button
+                                key={past.payment_id}
+                                type="button"
+                                onClick={() => handleToggleFixedPaymentPaid(past.payment_id, false)}
+                                className="btn-sm"
+                                style={{
+                                  background: '#fef2f2',
+                                  color: '#991b1b',
+                                  border: '1px solid #f87171',
+                                  borderRadius: '4px',
+                                  padding: '2px 8px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                                title="Oznacz zaległy miesiąc jako opłacony"
+                              >
+                                Opłać {past.label} ✓
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td data-label="Kategoria"><span className="badge-tag">{f.category || 'Stałe'}</span></td>
                       <td data-label="Termin" className="text-center">Do {f.due_day} dnia miesiąca</td>
                       <td data-label="Kwota" className={`text-right col-bold ${f.is_paid_this_month ? 'paid' : ''}`} style={{ color: f.is_paid_this_month ? '#10b981' : '#6366f1' }}>
-                        {formatPLN(f.amount)}
+                        <div>{formatPLN(f.amount)}</div>
+                        {f.unpaid_previous_total > 0 && (
+                          <div style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 600, marginTop: '2px' }}>
+                            + {formatPLN(f.unpaid_previous_total)} zaległości
+                          </div>
+                        )}
                       </td>
                       <td data-label="Akcje" className="text-center">
                         <div className="actions-cell-inline">
-                          <button className="btn-icon" onClick={() => openEditFixedModal(f)}>
+                          <button className="btn-icon" onClick={() => openEditFixedModal(f)} title="Edytuj">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                           </button>
-                          <button className="btn-icon delete" onClick={() => handleDeleteFixed(f.id)}>
+                          <button className="btn-icon delete" onClick={() => handleDeleteFixed(f.id)} title="Usuń">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                           </button>
                         </div>

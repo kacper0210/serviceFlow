@@ -32,6 +32,31 @@ async function recordAutoSnapshot(clientOrPool) {
 }
 
 // Helper to auto-reset monthly paid statuses and generate upcoming month's installment payments
+// Helper to auto-create monthly fixed expenses tracking records
+async function ensureFixedExpenseMonthlyRecords(clientOrPool, currentMonthStr) {
+  try {
+    const [yStr, mStr] = currentMonthStr.split('-');
+    const y = parseInt(yStr, 10);
+    const m = parseInt(mStr, 10);
+
+    const expensesRes = await clientOrPool.query("SELECT * FROM fixed_expenses WHERE is_active = true");
+    for (const exp of expensesRes.rows) {
+      const maxDays = new Date(y, m, 0).getDate();
+      const dueDay = Math.min(exp.due_day || 10, maxDays);
+      const dueDateStr = `${currentMonthStr}-${String(dueDay).padStart(2, '0')}`;
+
+      await clientOrPool.query(`
+        INSERT INTO fixed_expense_payments (fixed_expense_id, year_month, amount, due_date, is_paid)
+        VALUES ($1, $2, $3, $4, FALSE)
+        ON CONFLICT (fixed_expense_id, year_month) DO NOTHING
+      `, [exp.id, currentMonthStr, parseAmount(exp.amount), dueDateStr]);
+    }
+  } catch (err) {
+    console.error("[Ensure Fixed Expense Payments Error]", err);
+  }
+}
+
+// Helper to auto-reset monthly paid statuses and generate upcoming month's installment payments
 async function ensureMonthlyInstallmentsAndResets(clientOrPool) {
   try {
     const today = new Date();
@@ -55,7 +80,10 @@ async function ensureMonthlyInstallmentsAndResets(clientOrPool) {
         AND (last_paid_date IS NULL OR TO_CHAR(last_paid_date, 'YYYY-MM') < $1)
     `, [currentMonthStr]);
 
-    // 2. Auto-generate monthly installment entries in debt_payments for all active debts
+    // Ensure fixed expense monthly records exist for the current month
+    await ensureFixedExpenseMonthlyRecords(clientOrPool, currentMonthStr);
+
+    // 2. Auto-generate monthly installment entries in debt_payments for all active debts without creating duplicates
     const debtsRes = await clientOrPool.query(
       "SELECT id, creditor, total_amount, monthly_installment, capital_installment, interest_installment, due_day FROM debts WHERE monthly_installment > 0 AND total_amount > 0"
     );
@@ -63,10 +91,10 @@ async function ensureMonthlyInstallmentsAndResets(clientOrPool) {
     for (const debt of debtsRes.rows) {
       const existingPay = await clientOrPool.query(
         `SELECT id FROM debt_payments 
-         WHERE (debt_id = $1 OR LOWER(creditor) = LOWER($2)) 
-           AND TO_CHAR(due_date, 'YYYY-MM') = $3 
+         WHERE (debt_id = $1 OR LOWER(TRIM(creditor)) = LOWER(TRIM($2))) 
+           AND EXTRACT(YEAR FROM due_date) = $3 AND EXTRACT(MONTH FROM due_date) = $4 
          LIMIT 1`,
-        [debt.id, debt.creditor, currentMonthStr]
+        [debt.id, debt.creditor, year, month]
       );
 
       if (existingPay.rows.length === 0) {
@@ -81,9 +109,9 @@ async function ensureMonthlyInstallmentsAndResets(clientOrPool) {
         const schedRes = await clientOrPool.query(
           `SELECT * FROM debt_schedules 
            WHERE debt_id = $1 
-             AND TO_CHAR(due_date, 'YYYY-MM') = $2 
+             AND EXTRACT(YEAR FROM due_date) = $2 AND EXTRACT(MONTH FROM due_date) = $3 
            LIMIT 1`,
-          [debt.id, currentMonthStr]
+          [debt.id, year, month]
         );
 
         let amount = parseAmount(debt.monthly_installment);
@@ -103,7 +131,13 @@ async function ensureMonthlyInstallmentsAndResets(clientOrPool) {
 
         await clientOrPool.query(
           `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, is_paid, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (LOWER(TRIM(creditor)), (EXTRACT(YEAR FROM due_date)::int), (EXTRACT(MONTH FROM due_date)::int))
+           DO UPDATE SET
+             debt_id = COALESCE(EXCLUDED.debt_id, debt_payments.debt_id),
+             amount = EXCLUDED.amount,
+             capital_amount = EXCLUDED.capital_amount,
+             interest_amount = EXCLUDED.interest_amount`,
           [debt.id, debt.creditor, amount, capAmount, intAmount, dueDateStr, isPaid, notes]
         );
       }
@@ -197,6 +231,14 @@ router.post("/payments", asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, notes)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (LOWER(TRIM(creditor)), (EXTRACT(YEAR FROM due_date)::int), (EXTRACT(MONTH FROM due_date)::int))
+     DO UPDATE SET
+       debt_id = COALESCE(EXCLUDED.debt_id, debt_payments.debt_id),
+       amount = EXCLUDED.amount,
+       capital_amount = EXCLUDED.capital_amount,
+       interest_amount = EXCLUDED.interest_amount,
+       due_date = EXCLUDED.due_date,
+       notes = EXCLUDED.notes
      RETURNING id, debt_id, creditor, amount, capital_amount, interest_amount, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, is_paid, notes`,
     [debt_id || null, creditor, parsedAmount, parsedCapital, parsedInterest, due_date, notes || ""]
   );
@@ -275,9 +317,71 @@ router.put("/payments/:paymentId/toggle-paid", asyncHandler(async (req, res) => 
 // GET /api/debts/fixed-expenses
 router.get("/fixed-expenses", asyncHandler(async (req, res) => {
   await ensureMonthlyInstallmentsAndResets(pool);
-  const { rows } = await pool.query("SELECT * FROM fixed_expenses ORDER BY due_day ASC, name ASC");
-  const total = rows.filter(r => r.is_active).reduce((sum, r) => sum + parseAmount(r.amount), 0);
-  res.json({ expenses: rows, total_monthly: total });
+  const targetMonth = req.query.month || new Date().toISOString().substring(0, 7);
+
+  const { rows: expenses } = await pool.query("SELECT * FROM fixed_expenses ORDER BY due_day ASC, name ASC");
+  const { rows: monthlyPayments } = await pool.query(`
+    SELECT fep.*, fe.name, fe.category 
+    FROM fixed_expense_payments fep
+    JOIN fixed_expenses fe ON fep.fixed_expense_id = fe.id
+    WHERE fe.is_active = true
+    ORDER BY fep.due_date ASC
+  `);
+
+  const monthNames = [
+    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+  ];
+  function formatYm(ym) {
+    if (!ym) return '';
+    const [y, m] = ym.split('-').map(Number);
+    return `${monthNames[m - 1]} ${y}`;
+  }
+
+  // Attach monthly info to each expense
+  const enrichedExpenses = expenses.map(exp => {
+    // Target month payment
+    const currPay = monthlyPayments.find(p => p.fixed_expense_id === exp.id && p.year_month === targetMonth);
+    const isPaidInTargetMonth = currPay ? Boolean(currPay.is_paid) : Boolean(exp.is_paid_this_month);
+
+    // Unpaid past months (strictly prior to targetMonth)
+    const unpaidPast = monthlyPayments
+      .filter(p => p.fixed_expense_id === exp.id && p.year_month < targetMonth && !p.is_paid)
+      .map(p => ({
+        payment_id: p.id,
+        year_month: p.year_month,
+        label: formatYm(p.year_month),
+        amount: parseAmount(p.amount),
+        due_date: p.due_date ? new Date(p.due_date).toISOString().split('T')[0] : null
+      }));
+
+    const unpaidTotal = unpaidPast.reduce((sum, p) => sum + p.amount, 0);
+
+    return {
+      ...exp,
+      is_paid_this_month: isPaidInTargetMonth,
+      target_month_payment_id: currPay ? currPay.id : null,
+      unpaid_previous_months: unpaidPast,
+      unpaid_previous_total: unpaidTotal
+    };
+  });
+
+  // All overdue fixed expense payments prior to targetMonth across all active expenses
+  const allOverdueFixed = monthlyPayments
+    .filter(p => p.year_month < targetMonth && !p.is_paid)
+    .map(p => ({
+      payment_id: p.id,
+      fixed_expense_id: p.fixed_expense_id,
+      name: p.name,
+      category: p.category,
+      year_month: p.year_month,
+      month_label: formatYm(p.year_month),
+      amount: parseAmount(p.amount),
+      due_date: p.due_date ? new Date(p.due_date).toISOString().split('T')[0] : null
+    }));
+
+  const total = expenses.filter(r => r.is_active).reduce((sum, r) => sum + parseAmount(r.amount), 0);
+  res.json({ expenses: enrichedExpenses, all_overdue_fixed: allOverdueFixed, total_monthly: total });
 }));
 
 // POST /api/debts/fixed-expenses
@@ -294,7 +398,22 @@ router.post("/fixed-expenses", asyncHandler(async (req, res) => {
     [name, parseAmount(amount), due_day || 10, category || "Stałe", notes || ""]
   );
 
-  res.status(201).json(rows[0]);
+  const created = rows[0];
+  const currentMonthStr = new Date().toISOString().substring(0, 7);
+  const [yStr, mStr] = currentMonthStr.split('-');
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  const maxDays = new Date(y, m, 0).getDate();
+  const actualDueDay = Math.min(created.due_day || 10, maxDays);
+  const dueDateStr = `${currentMonthStr}-${String(actualDueDay).padStart(2, '0')}`;
+
+  await pool.query(`
+    INSERT INTO fixed_expense_payments (fixed_expense_id, year_month, amount, due_date, is_paid)
+    VALUES ($1, $2, $3, $4, FALSE)
+    ON CONFLICT (fixed_expense_id, year_month) DO NOTHING
+  `, [created.id, currentMonthStr, parseAmount(created.amount), dueDateStr]);
+
+  res.status(201).json(created);
 }));
 
 // PUT /api/debts/fixed-expenses/:id
@@ -314,26 +433,73 @@ router.put("/fixed-expenses/:id", asyncHandler(async (req, res) => {
   res.json(rows[0]);
 }));
 
-// PUT /api/debts/fixed-expenses/:id/toggle-paid
-router.put("/fixed-expenses/:id/toggle-paid", asyncHandler(async (req, res) => {
-  const { id } = req.params;
+// PUT /api/debts/fixed-expenses/payments/:paymentId/toggle-paid - Toggle specific historical/monthly fixed expense payment
+router.put("/fixed-expenses/payments/:paymentId/toggle-paid", asyncHandler(async (req, res) => {
+  const { paymentId } = req.params;
   const { is_paid } = req.body;
 
-  let query = "";
-  let params = [];
+  const currentRes = await pool.query("SELECT * FROM fixed_expense_payments WHERE id = $1", [paymentId]);
+  if (currentRes.rows.length === 0) return res.status(404).json({ error: "Brak wpisu płatności" });
 
-  if (is_paid !== undefined) {
-    const paidVal = Boolean(is_paid);
-    query = `UPDATE fixed_expenses SET is_paid_this_month = $1, last_paid_date = ${paidVal ? 'NOW()' : 'last_paid_date'} WHERE id = $2 RETURNING *`;
-    params = [paidVal, id];
-  } else {
-    query = `UPDATE fixed_expenses SET is_paid_this_month = NOT COALESCE(is_paid_this_month, false), last_paid_date = CASE WHEN NOT COALESCE(is_paid_this_month, false) THEN NOW() ELSE last_paid_date END WHERE id = $1 RETURNING *`;
-    params = [id];
+  const current = currentRes.rows[0];
+  const newStatus = is_paid !== undefined ? Boolean(is_paid) : !current.is_paid;
+
+  const { rows } = await pool.query(
+    "UPDATE fixed_expense_payments SET is_paid = $1, paid_at = $2 WHERE id = $3 RETURNING *",
+    [newStatus, newStatus ? new Date() : null, paymentId]
+  );
+
+  const updatedPay = rows[0];
+  const currentMonthStr = new Date().toISOString().substring(0, 7);
+
+  // If this was current month, also sync parent fixed_expense row
+  if (updatedPay.year_month === currentMonthStr) {
+    await pool.query(
+      "UPDATE fixed_expenses SET is_paid_this_month = $1, last_paid_date = $2 WHERE id = $3",
+      [newStatus, newStatus ? new Date() : null, updatedPay.fixed_expense_id]
+    );
   }
 
-  const { rows } = await pool.query(query, params);
-  if (rows.length === 0) return res.status(404).json({ error: "Brak wpisu" });
-  res.json(rows[0]);
+  res.json(updatedPay);
+}));
+
+// PUT /api/debts/fixed-expenses/:id/toggle-paid - Toggle paid status for fixed expense
+router.put("/fixed-expenses/:id/toggle-paid", asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { is_paid, month } = req.body;
+  const targetMonth = month || new Date().toISOString().substring(0, 7);
+
+  const expRes = await pool.query("SELECT * FROM fixed_expenses WHERE id = $1", [id]);
+  if (expRes.rows.length === 0) return res.status(404).json({ error: "Brak wpisu" });
+  const exp = expRes.rows[0];
+
+  const currentMonthStr = new Date().toISOString().substring(0, 7);
+  const newStatus = is_paid !== undefined ? Boolean(is_paid) : !exp.is_paid_this_month;
+
+  if (targetMonth === currentMonthStr) {
+    await pool.query(
+      `UPDATE fixed_expenses SET is_paid_this_month = $1, last_paid_date = $2 WHERE id = $3`,
+      [newStatus, newStatus ? new Date() : null, id]
+    );
+  }
+
+  const [yStr, mStr] = targetMonth.split('-');
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  const maxDays = new Date(y, m, 0).getDate();
+  const dueDay = Math.min(exp.due_day || 10, maxDays);
+  const dueDateStr = `${targetMonth}-${String(dueDay).padStart(2, '0')}`;
+
+  await pool.query(`
+    INSERT INTO fixed_expense_payments (fixed_expense_id, year_month, amount, due_date, is_paid, paid_at)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    ON CONFLICT (fixed_expense_id, year_month) DO UPDATE SET
+      is_paid = EXCLUDED.is_paid,
+      paid_at = EXCLUDED.paid_at
+  `, [id, targetMonth, parseAmount(exp.amount), dueDateStr, newStatus, newStatus ? new Date() : null]);
+
+  const updatedExp = await pool.query("SELECT * FROM fixed_expenses WHERE id = $1", [id]);
+  res.json(updatedExp.rows[0]);
 }));
 
 // DELETE /api/debts/fixed-expenses/:id
@@ -707,10 +873,41 @@ async function handleToggleScheduleItem(scheduleId, res) {
       [hasPaidInCurrentMonth, debt.id]
     );
 
-    if (newPaidStatus) {
+    // Sync with debt_payments to prevent duplicates
+    const itemDate = new Date(item.due_date);
+    const iYear = itemDate.getFullYear();
+    const iMonth = itemDate.getMonth() + 1;
+
+    const existingPay = await client.query(
+      `SELECT id FROM debt_payments 
+       WHERE (debt_id = $1 OR LOWER(TRIM(creditor)) = LOWER(TRIM($2))) 
+         AND EXTRACT(YEAR FROM due_date) = $3 AND EXTRACT(MONTH FROM due_date) = $4
+       LIMIT 1`,
+      [debt.id, debt.creditor, iYear, iMonth]
+    );
+
+    if (existingPay.rows.length > 0) {
+      await client.query(
+        `UPDATE debt_payments 
+         SET is_paid = $1, paid_at = $2, amount = $3, capital_amount = $4, interest_amount = $5, due_date = $6, notes = $7 
+         WHERE id = $8`,
+        [
+          newPaidStatus,
+          newPaidStatus ? new Date() : null,
+          parseAmount(item.total_installment),
+          parseAmount(item.capital_part),
+          parseAmount(item.interest_part),
+          item.due_date,
+          `Rata nr ${item.installment_number} z harmonogramu spłat`,
+          existingPay.rows[0].id
+        ]
+      );
+    } else if (newPaidStatus) {
       await client.query(
         `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, is_paid, paid_at, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), $7)
+         ON CONFLICT (LOWER(TRIM(creditor)), (EXTRACT(YEAR FROM due_date)::int), (EXTRACT(MONTH FROM due_date)::int))
+         DO UPDATE SET is_paid = true, paid_at = NOW(), amount = EXCLUDED.amount, capital_amount = EXCLUDED.capital_amount, interest_amount = EXCLUDED.interest_amount`,
         [
           debt.id,
           debt.creditor,
@@ -904,9 +1101,11 @@ router.put("/:id/toggle-monthly-paid", asyncHandler(async (req, res) => {
     const currentMonthPrefix = todayStr.substring(0, 7); // 'YYYY-MM'
     const existingPayment = await client.query(
       `SELECT id FROM debt_payments 
-       WHERE (debt_id = $1 OR LOWER(creditor) = LOWER($2)) AND TO_CHAR(due_date, 'YYYY-MM') = $3 
+       WHERE (debt_id = $1 OR LOWER(TRIM(creditor)) = LOWER(TRIM($2))) 
+         AND EXTRACT(YEAR FROM due_date) = EXTRACT(YEAR FROM $3::date) 
+         AND EXTRACT(MONTH FROM due_date) = EXTRACT(MONTH FROM $3::date)
        LIMIT 1`,
-      [debt.id, debt.creditor, currentMonthPrefix]
+      [debt.id, debt.creditor, todayStr]
     );
 
     if (newPaidStatus) {
@@ -918,7 +1117,9 @@ router.put("/:id/toggle-monthly-paid", asyncHandler(async (req, res) => {
       } else {
         await client.query(
           `INSERT INTO debt_payments (debt_id, creditor, amount, capital_amount, interest_amount, due_date, is_paid, paid_at, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), 'Rata miesięczna odznaczona w wykazie (spłata kapitału)')`,
+           VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), 'Rata miesięczna odznaczona w wykazie (spłata kapitału)')
+           ON CONFLICT (LOWER(TRIM(creditor)), (EXTRACT(YEAR FROM due_date)::int), (EXTRACT(MONTH FROM due_date)::int))
+           DO UPDATE SET is_paid = true, paid_at = NOW(), amount = EXCLUDED.amount, capital_amount = EXCLUDED.capital_amount, interest_amount = EXCLUDED.interest_amount`,
           [
             debt.id,
             debt.creditor,

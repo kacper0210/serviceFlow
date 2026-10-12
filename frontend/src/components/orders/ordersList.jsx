@@ -40,7 +40,14 @@ export default function OrdersList() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [selectedStatuses, setSelectedStatuses] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const statusParam = params.get("status");
+    if (statusParam) {
+      return statusParam.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return ['w_trakcie', 'zakonczone'];
+  });
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [filterMonth, setFilterMonth] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -217,7 +224,7 @@ export default function OrdersList() {
         const st = (order.status || "").toLowerCase();
         const matchesAny = selectedStatuses.some(statusKey => {
           if (statusKey === "zakonczone" && (st === "completed" || st.includes("zako"))) return true;
-          if (statusKey === "w_trakcie" && (st === "in_progress" || st.includes("trakcie"))) return true;
+          if (statusKey === "w_trakcie" && (st === "in_progress" || st.includes("trakcie") || st.includes("realizac"))) return true;
           if (statusKey === "nowe" && (st === "new" || st.includes("now"))) return true;
           if (statusKey === "wstrzymane" && (st === "on_hold" || st.includes("wstrzyma"))) return true;
           return false;

@@ -292,6 +292,39 @@ async function ensureDbTablesExist() {
     `, "invoices");
 
     await safeQuery(`
+      CREATE TABLE IF NOT EXISTS fixed_expense_payments (
+        id SERIAL PRIMARY KEY,
+        fixed_expense_id INT NOT NULL REFERENCES fixed_expenses(id) ON DELETE CASCADE,
+        year_month VARCHAR(7) NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        due_date DATE,
+        is_paid BOOLEAN DEFAULT FALSE,
+        paid_at TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_fixed_expense_month UNIQUE (fixed_expense_id, year_month)
+      );
+      CREATE INDEX IF NOT EXISTS idx_fixed_expense_payments_month ON fixed_expense_payments (year_month, is_paid);
+      CREATE INDEX IF NOT EXISTS idx_fixed_expense_payments_exp ON fixed_expense_payments (fixed_expense_id);
+    `, "fixed_expense_payments");
+
+    await safeQuery(`
+      DELETE FROM debt_payments
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY LOWER(TRIM(creditor)), EXTRACT(YEAR FROM due_date), EXTRACT(MONTH FROM due_date)
+            ORDER BY id ASC
+          ) as rn
+          FROM debt_payments
+        ) t
+        WHERE t.rn > 1
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_debt_payments_creditor_month
+      ON debt_payments (LOWER(TRIM(creditor)), (EXTRACT(YEAR FROM due_date)::int), (EXTRACT(MONTH FROM due_date)::int));
+    `, "uq_debt_payments_creditor_month");
+
+    await safeQuery(`
       CREATE INDEX IF NOT EXISTS idx_ksef_invoices_date ON ksef_invoices(date DESC);
       CREATE INDEX IF NOT EXISTS idx_issues_status_created ON issues(status, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_debts_creditor ON debts(creditor);

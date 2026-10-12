@@ -547,7 +547,7 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
     const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     
     const queryUrl = `${apiUrl}/invoices/query/metadata`;
-    const pageSize = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 100;
+    const pageSize = limit ? Math.min(250, Math.max(10, parseInt(limit, 10))) : 100;
     let allInvoices = [];
 
     for (const subjectType of ["Subject1", "Subject2"]) {
@@ -560,17 +560,16 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
       let hasMore = true;
 
       while (hasMore) {
+        // In official KSeF 2.0 API, pageOffset and pageSize are query parameters in the URL
+        const pagedQueryUrl = `${queryUrl}?pageOffset=${pageOffset}&pageSize=${pageSize}`;
+
         const queryBody = {
           subjectType: subjectType,
           dateRange: {
             from: `${dateFrom}T00:00:00Z`,
             to: `${dateTo}T23:59:59Z`,
             dateType: "Issue"
-          },
-          pageSize: pageSize,
-          pageOffset: pageOffset,
-          PageSize: pageSize,
-          PageOffset: pageOffset
+          }
         };
 
         const queryOptions = {
@@ -583,20 +582,25 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
           body: JSON.stringify(queryBody)
         };
 
-        let queryRes = await fetchWithRetry(queryUrl, queryOptions);
+        let queryRes = await fetchWithRetry(pagedQueryUrl, queryOptions);
         if (queryRes.status === 401) {
           console.warn("[KSeF Auth 401] Access token rejected. Invalidating DB session and re-authenticating...");
           await clearSessionInDb(pool, nip);
           const freshSession = await authenticateKSeF(nip, decryptedToken, env, pool);
           queryOptions.headers['Authorization'] = `Bearer ${freshSession.accessToken}`;
-          queryRes = await fetchWithRetry(queryUrl, queryOptions);
+          queryRes = await fetchWithRetry(pagedQueryUrl, queryOptions);
         }
 
         if (queryRes.ok) {
           const data = await queryRes.json();
           const list = data.invoices || data.invoiceMetadataList || data.invoiceHeaderList || [];
           
-          for (const inv of list) {
+          const infoLog = `[KSeF Sync] ${subjectType} (strona ${pageOffset + 1}): pobrano ${list.length} faktur (hasMore: ${data.hasMore === true})`;
+          console.log(infoLog);
+          lastSyncLogs.push(infoLog);
+
+          const itemsToProcess = limit ? list.slice(0, parseInt(limit, 10)) : list;
+          for (const inv of itemsToProcess) {
             const refNum = inv.ksefNumber || inv.ksefInvoiceReferenceNumber || inv.ksefReferenceNumber || inv.invoiceKsefNumber;
             const invNum = inv.invoiceNumber || inv.invoiceReferenceNumber || (refNum ? 'FV/' + refNum.substring(0, 10) : 'KSEF');
             
@@ -605,18 +609,18 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
 
             if (isSales) {
               if (inv.buyer) {
-                contractorNip = inv.buyer.nip || '0000000000';
+                contractorNip = inv.buyer.identifier?.value || inv.buyer.nip || '0000000000';
                 contractorName = inv.buyer.name || 'Nabywca KSeF';
               } else if (inv.subject2) {
-                contractorNip = inv.subject2.identifier?.identifier || inv.subject2.nip || '0000000000';
+                contractorNip = inv.subject2.identifier?.identifier || inv.subject2.identifier?.value || inv.subject2.nip || '0000000000';
                 contractorName = inv.subject2.name || inv.subject2.fullName || 'Nabywca KSeF';
               }
             } else {
               if (inv.seller) {
-                contractorNip = inv.seller.nip || '0000000000';
+                contractorNip = inv.seller.identifier?.value || inv.seller.nip || '0000000000';
                 contractorName = inv.seller.name || 'Sprzedawca KSeF';
               } else if (inv.subject1) {
-                contractorNip = inv.subject1.identifier?.identifier || inv.subject1.nip || '0000000000';
+                contractorNip = inv.subject1.identifier?.identifier || inv.subject1.identifier?.value || inv.subject1.nip || '0000000000';
                 contractorName = inv.subject1.name || inv.subject1.fullName || 'Sprzedawca KSeF';
               }
             }
@@ -639,16 +643,12 @@ async function syncInvoicesToDb(pool, nip, decryptedToken, env, year, month, lim
               subject_type: subjectType
             });
           }
-          // Advance to the next page. Without this, PageOffset stayed at 0 forever
-          // whenever the API reported hasMore=true, so the loop kept re-requesting
-          // the SAME first page as fast as possible - hammering the KSeF
-          // /invoices/query/metadata endpoint (limit: 8/s, 16/min, 20/h) until MF
-          // blocked further requests for the rest of the hour. This is why even a
-          // "first" sync could get blocked instantly whenever a subject had more
-          // invoices than one page (PageSize).
-          pageOffset += list.length || pageSize;
-          // Stop pagination immediately if returned items are less than pageSize (last page reached)
-          hasMore = limit ? false : (data.hasMore === true && list.length >= pageSize && list.length > 0);
+
+          // Advance to the next page. In KSeF API, pageOffset is 0-indexed page number (0, 1, 2...)
+          pageOffset += 1;
+
+          // Stop pagination if limit was specified or hasMore is false or no items returned
+          hasMore = limit ? false : (data.hasMore === true && list.length > 0 && pageOffset < 50);
 
           // Small pause between pages of the same subject so we stay under the
           // per-second/per-minute sub-limits too, not just the hourly one.
